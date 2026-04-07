@@ -84,8 +84,11 @@
     <Border Grid.Row="1" Background="#1e1e2e" IsVisible="{Binding IsQueueVisible}"
             MaxHeight="200" Padding="0">
         <DockPanel>
-            <!-- Queue Header -->
-            <Border DockPanel.Dock="Top" Background="#11111b" Padding="16,8">
+            <!-- Queue Header (clickable to collapse) -->
+            <Button DockPanel.Dock="Top" Command="{Binding ToggleQueueCommand}"
+                    Background="#11111b" Padding="16,8" CornerRadius="0"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                    Cursor="Hand">
                 <DockPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <TextBlock Text="Processing Queue" FontSize="13" FontWeight="SemiBold"
@@ -105,14 +108,9 @@
                                 Command="{Binding ClearAllJobsCommand}"
                                 Background="#313244" Foreground="#f38ba8"
                                 CornerRadius="4" Padding="8,3" FontSize="11"/>
-                        <Button Command="{Binding ToggleQueueCommand}"
-                                Background="#313244" Foreground="#bac2de"
-                                CornerRadius="4" Padding="8,3" FontSize="11">
-                            <TextBlock Text="Collapse"/>
-                        </Button>
                     </StackPanel>
                 </DockPanel>
-            </Border>
+            </Button>
             <!-- Queue Items -->
             <ScrollViewer>
                 <ItemsControl ItemsSource="{Binding JobQueue}" Margin="8,4">
