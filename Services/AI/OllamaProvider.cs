@@ -18,10 +18,10 @@ public class OllamaProvider : IAiProvider
 
     public string ProviderName => "Ollama";
 
-    public OllamaProvider(string baseUrl = "http://localhost:11434")
+    public OllamaProvider(string baseUrl = "http://localhost:11434", TimeSpan? timeout = null)
     {
         _baseUrl = baseUrl.TrimEnd('/');
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromMinutes(15) };
     }
 
     public async Task<List<AiModel>> GetAvailableModelsAsync(CancellationToken ct = default)

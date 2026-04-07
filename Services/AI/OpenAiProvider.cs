@@ -19,11 +19,11 @@ public class OpenAiProvider : IAiProvider
 
     public string ProviderName => "OpenAI";
 
-    public OpenAiProvider(string apiKey, string baseUrl = "https://api.openai.com/v1")
+    public OpenAiProvider(string apiKey, string baseUrl = "https://api.openai.com/v1", TimeSpan? timeout = null)
     {
         _apiKey = apiKey;
         _baseUrl = baseUrl.TrimEnd('/');
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromMinutes(15) };
         if (!string.IsNullOrEmpty(apiKey))
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VoxMemo.Services.Database;
@@ -13,6 +14,7 @@ public static class AiProviderFactory
         string openAiKey = "";
         string openAiBaseUrl = "https://api.openai.com/v1";
         string anthropicKey = "";
+        int timeoutMinutes = 15;
 
         try
         {
@@ -22,17 +24,20 @@ public static class AiProviderFactory
             openAiKey = (await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "openai_api_key"))?.Value ?? "";
             openAiBaseUrl = (await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "openai_base_url"))?.Value ?? openAiBaseUrl;
             anthropicKey = (await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "anthropic_api_key"))?.Value ?? "";
+            if (int.TryParse((await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "ai_timeout_minutes"))?.Value, out var t))
+                timeoutMinutes = t;
         }
         catch { }
 
+        var timeout = TimeSpan.FromMinutes(timeoutMinutes);
+
         IAiProvider provider = providerName switch
         {
-            "OpenAI" => new OpenAiProvider(openAiKey, openAiBaseUrl),
-            "Anthropic" when !string.IsNullOrEmpty(anthropicKey) => new AnthropicProvider(anthropicKey),
-            _ => new OllamaProvider(ollamaUrl)
+            "OpenAI" => new OpenAiProvider(openAiKey, openAiBaseUrl, timeout),
+            "Anthropic" when !string.IsNullOrEmpty(anthropicKey) => new AnthropicProvider(anthropicKey, timeout: timeout),
+            _ => new OllamaProvider(ollamaUrl, timeout)
         };
 
-        // Try to get the first available model
         string? modelId = null;
         try
         {

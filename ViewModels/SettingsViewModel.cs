@@ -81,6 +81,9 @@ public partial class SettingsViewModel : ViewModelBase
     private string _recordingHotkey = "Ctrl+Shift+R";
 
     [ObservableProperty]
+    private int _aiTimeoutMinutes = 15;
+
+    [ObservableProperty]
     private string _customSummaryPrompt = string.Empty;
 
     [ObservableProperty]
@@ -172,6 +175,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAutoTranscribeChanged(bool value) => SaveIfNotLoading();
     partial void OnAutoSummarizeChanged(bool value) => SaveIfNotLoading();
     partial void OnSmartProcessSkipDialogChanged(bool value) => SaveIfNotLoading();
+    partial void OnAiTimeoutMinutesChanged(int value) => SaveIfNotLoading();
     partial void OnCustomSummaryPromptChanged(string value) => SaveIfNotLoading();
     partial void OnCustomSpeakerPromptChanged(string value) => SaveIfNotLoading();
     partial void OnRecordingHotkeyChanged(string value)
@@ -212,6 +216,8 @@ public partial class SettingsViewModel : ViewModelBase
             AutoSummarize = (await GetSettingAsync(db, "auto_summarize", "true")) == "true";
             SmartProcessSkipDialog = (await GetSettingAsync(db, "smart_process_skip_dialog", "false")) == "true";
             RecordingHotkey = await GetSettingAsync(db, "recording_hotkey", "Ctrl+Shift+R");
+            if (int.TryParse(await GetSettingAsync(db, "ai_timeout_minutes", "5"), out var timeout))
+                AiTimeoutMinutes = timeout;
             CustomSummaryPrompt = await GetSettingAsync(db, "custom_summary_prompt", string.Empty);
             CustomSpeakerPrompt = await GetSettingAsync(db, "custom_speaker_prompt", string.Empty);
             StartWithWindows = Services.Platform.PlatformServices.Startup.IsStartupEnabled();
@@ -256,6 +262,7 @@ public partial class SettingsViewModel : ViewModelBase
             await SetSettingAsync(db, "auto_summarize", AutoSummarize ? "true" : "false");
             await SetSettingAsync(db, "smart_process_skip_dialog", SmartProcessSkipDialog ? "true" : "false");
             await SetSettingAsync(db, "recording_hotkey", RecordingHotkey);
+            await SetSettingAsync(db, "ai_timeout_minutes", AiTimeoutMinutes.ToString());
             await SetSettingAsync(db, "custom_summary_prompt", CustomSummaryPrompt);
             await SetSettingAsync(db, "custom_speaker_prompt", CustomSpeakerPrompt);
             await SetSettingAsync(db, "enabled_languages", string.Join(",", EnabledLanguages.Select(l => l.Code)));

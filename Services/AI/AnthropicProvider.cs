@@ -17,10 +17,10 @@ public class AnthropicProvider : IAiProvider
 
     public string ProviderName => "Anthropic";
 
-    public AnthropicProvider(string apiKey, string baseUrl = "https://api.anthropic.com")
+    public AnthropicProvider(string apiKey, string baseUrl = "https://api.anthropic.com", TimeSpan? timeout = null)
     {
         _baseUrl = baseUrl;
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromMinutes(15) };
         _http.DefaultRequestHeaders.Add("x-api-key", apiKey);
         _http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
     }
