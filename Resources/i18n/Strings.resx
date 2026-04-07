@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <data name="AppName"><value>E-Script</value></data>
+  <data name="AppSubtitle"><value>Meeting Recorder</value></data>
+  <data name="Recording"><value>Recording</value></data>
+  <data name="Meetings"><value>Meetings</value></data>
+  <data name="Settings"><value>Settings</value></data>
+  <data name="Language"><value>Language</value></data>
+  <data name="MeetingDetails"><value>Meeting Details</value></data>
+  <data name="Title"><value>Title</value></data>
+  <data name="EnterMeetingTitle"><value>Enter meeting title...</value></data>
+  <data name="AudioDevices"><value>Audio Devices</value></data>
+  <data name="Microphone"><value>Microphone</value></data>
+  <data name="SystemAudio"><value>System Audio (Loopback)</value></data>
+  <data name="Refresh"><value>Refresh</value></data>
+  <data name="StartRecording"><value>Start Recording</value></data>
+  <data name="Stop"><value>Stop</value></data>
+  <data name="Pause"><value>Pause</value></data>
+  <data name="Resume"><value>Resume</value></data>
+  <data name="ReadyToRecord"><value>Ready to record</value></data>
+  <data name="RecordingInProgress"><value>Recording...</value></data>
+  <data name="Paused"><value>Paused</value></data>
+  <data name="RecordingSaved"><value>Recording saved</value></data>
+  <data name="SearchMeetings"><value>Search meetings...</value></data>
+  <data name="SelectMeeting"><value>Select a meeting</value></data>
+  <data name="Transcript"><value>Transcript</value></data>
+  <data name="Summary"><value>Summary</value></data>
+  <data name="Transcribe"><value>Transcribe</value></data>
+  <data name="Transcribing"><value>Transcribing...</value></data>
+  <data name="SummarizeWithAI"><value>Summarize with AI</value></data>
+  <data name="Summarizing"><value>Summarizing...</value></data>
+  <data name="AIProvider"><value>AI Provider</value></data>
+  <data name="Provider"><value>Provider</value></data>
+  <data name="OllamaURL"><value>Ollama URL</value></data>
+  <data name="TestConnection"><value>Test Connection</value></data>
+  <data name="AIModel"><value>AI Model</value></data>
+  <data name="RefreshModels"><value>Refresh Models</value></data>
+  <data name="Transcription"><value>Transcription (Whisper)</value></data>
+  <data name="ActiveModel"><value>Active Model</value></data>
+  <data name="DownloadModel"><value>Download Model</value></data>
+  <data name="General"><value>General</value></data>
+  <data name="DefaultLanguage"><value>Default Language</value></data>
+</root>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#89b4fa"/>
+      <stop offset="100%" stop-color="#a6e3a1"/>
+    </linearGradient>
+    <linearGradient id="accent-v" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#89b4fa"/>
+      <stop offset="100%" stop-color="#a6e3a1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="246" fill="#1e1e2e"/>
+
+  <!-- Microphone capsule (pill shape, left of center) -->
+  <rect x="170" y="110" width="76" height="148" rx="38" fill="url(#accent)"/>
+
+  <!-- Microphone cradle arc (U-shape under capsule) -->
+  <path d="M152 220 A56 56 0 0 0 264 220" fill="none" stroke="url(#accent-v)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Microphone stand (vertical + base) -->
+  <line x1="208" y1="276" x2="208" y2="330" stroke="url(#accent-v)" stroke-width="14" stroke-linecap="round"/>
+  <line x1="172" y1="330" x2="244" y2="330" stroke="url(#accent-v)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Sound waves (emanating right from mic, blue, fading out) -->
+  <path d="M280 155 Q305 195 280 235" fill="none" stroke="#89b4fa" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <path d="M305 138 Q340 195 305 252" fill="none" stroke="#89b4fa" stroke-width="10" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Text/transcription lines (right side, green, staggered lengths) -->
+  <line x1="290" y1="290" x2="390" y2="290" stroke="#a6e3a1" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
+  <line x1="290" y1="320" x2="365" y2="320" stroke="#a6e3a1" stroke-width="10" stroke-linecap="round" opacity="0.7"/>
+  <line x1="290" y1="350" x2="378" y2="350" stroke="#a6e3a1" stroke-width="10" stroke-linecap="round" opacity="0.5"/>
+</svg>

@@ -1,0 +1,209 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VoxMemo.ViewModels"
+        xmlns:views="using:VoxMemo.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
+        x:Class="VoxMemo.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/voxmemo-icon.ico"
+        Title="VoxMemo - Meeting Recorder"
+        Width="1100" Height="700"
+        MinWidth="800" MinHeight="500">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto,Auto">
+    <Grid Grid.Row="0" ColumnDefinitions="220,*">
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="#1e1e2e" Padding="0">
+            <DockPanel>
+                <!-- App Title -->
+                <StackPanel DockPanel.Dock="Top" Margin="20,20,20,30">
+                    <TextBlock Text="VoxMemo"
+                               FontSize="24" FontWeight="Bold"
+                               Foreground="#cdd6f4"/>
+                    <TextBlock Text="Meeting Recorder"
+                               FontSize="12" Foreground="#6c7086" Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- Navigation -->
+                <ListBox SelectedIndex="{Binding SelectedNavIndex}"
+                         Background="Transparent"
+                         Margin="8,0">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="16,12"/>
+                            <Setter Property="Margin" Value="0,2"/>
+                            <Setter Property="CornerRadius" Value="8"/>
+                            <Setter Property="Foreground" Value="#cdd6f4"/>
+                        </Style>
+                        <Style Selector="ListBoxItem:selected">
+                            <Setter Property="Background" Value="#313244"/>
+                        </Style>
+                        <Style Selector="ListBoxItem:pointerover">
+                            <Setter Property="Background" Value="#2a2a3c"/>
+                        </Style>
+                    </ListBox.Styles>
+
+                    <ListBoxItem>
+                        <TextBlock Text="Recording" FontSize="14" VerticalAlignment="Center"/>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <TextBlock Text="Meetings" FontSize="14" VerticalAlignment="Center"/>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <TextBlock Text="Settings" FontSize="14" VerticalAlignment="Center"/>
+                    </ListBoxItem>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Border Grid.Column="1" Background="#181825">
+            <ContentControl Content="{Binding CurrentView}">
+                <ContentControl.DataTemplates>
+                    <DataTemplate DataType="vm:RecordingViewModel">
+                        <views:RecordingView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:MeetingsViewModel">
+                        <views:MeetingsView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:SettingsViewModel">
+                        <views:SettingsView/>
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Border>
+    </Grid>
+
+    <!-- Job Queue Panel -->
+    <Border Grid.Row="1" Background="#1e1e2e" IsVisible="{Binding IsQueueVisible}"
+            MaxHeight="200" Padding="0">
+        <DockPanel>
+            <!-- Queue Header -->
+            <Border DockPanel.Dock="Top" Background="#11111b" Padding="16,8">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Processing Queue" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#cdd6f4"/>
+                        <Border Background="#45475a" CornerRadius="4" Padding="6,2">
+                            <TextBlock Text="{Binding JobQueue.Count}" FontSize="11" Foreground="#cdd6f4"
+                                       FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                HorizontalAlignment="Right">
+                        <Button Content="Clear Done"
+                                Command="{Binding ClearCompletedJobsCommand}"
+                                Background="#313244" Foreground="#bac2de"
+                                CornerRadius="4" Padding="8,3" FontSize="11"/>
+                        <Button Content="Clear All"
+                                Command="{Binding ClearAllJobsCommand}"
+                                Background="#313244" Foreground="#f38ba8"
+                                CornerRadius="4" Padding="8,3" FontSize="11"/>
+                        <Button Command="{Binding ToggleQueueCommand}"
+                                Background="#313244" Foreground="#bac2de"
+                                CornerRadius="4" Padding="8,3" FontSize="11">
+                            <TextBlock Text="Collapse"/>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <!-- Queue Items -->
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding JobQueue}" Margin="8,4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProcessingJobViewModel">
+                            <Border Background="#313244" CornerRadius="6" Padding="12,8" Margin="0,2">
+                                <DockPanel>
+                                    <!-- Cancel button for active jobs -->
+                                    <Button DockPanel.Dock="Right"
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveJobCommand}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding IsActive}"
+                                            Background="#f38ba8" Foreground="#1e1e2e"
+                                            CornerRadius="4" Padding="10,4" FontSize="11"
+                                            FontWeight="SemiBold"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="Cancel"/>
+                                    </Button>
+                                    <!-- Remove button for queued/completed/failed -->
+                                    <Button DockPanel.Dock="Right"
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveJobCommand}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding !IsActive}"
+                                            Background="#45475a" Foreground="#bac2de"
+                                            CornerRadius="4" Padding="8,4" FontSize="11"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="Remove"/>
+                                    </Button>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding MeetingTitle}" FontSize="13" Foreground="#cdd6f4"
+                                                   TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#cba6f7"
+                                                       IsVisible="{Binding IsActive}"/>
+                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#a6e3a1"
+                                                       IsVisible="{Binding IsComplete}"/>
+                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#f38ba8"
+                                                       IsVisible="{Binding IsFailed}"/>
+                                            <TextBlock Text="Queued" FontSize="11" Foreground="#bac2de">
+                                                <TextBlock.IsVisible>
+                                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                        <Binding Path="!IsActive"/>
+                                                        <Binding Path="!IsComplete"/>
+                                                        <Binding Path="!IsFailed"/>
+                                                    </MultiBinding>
+                                                </TextBlock.IsVisible>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Step}" FontSize="11" Foreground="#cdd6f4"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding Step, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            <TextBlock Text="{Binding Elapsed}" FontSize="11" Foreground="#bac2de"
+                                                       IsVisible="{Binding Elapsed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+
+    <!-- Status Bar -->
+    <Border Grid.Row="2" Background="#11111b" Padding="12,6">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Right"
+                       Text="Anzdev4life"
+                       FontSize="11" Foreground="#cdd6f4"
+                       VerticalAlignment="Center"/>
+            <TextBlock Text="VoxMemo"
+                       FontSize="11" Foreground="#bac2de"
+                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <!-- Queue toggle + Processing indicator -->
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Command="{Binding ToggleQueueCommand}"
+                        Background="Transparent" Foreground="#cdd6f4"
+                        Padding="6,2" CornerRadius="4" FontSize="11"
+                        IsVisible="{Binding JobQueue.Count}">
+                    <TextBlock Text="{Binding JobQueue.Count, StringFormat='Queue ({0})'}"/>
+                </Button>
+                <Border Background="#cba6f7" CornerRadius="4" Padding="6,2"
+                        IsVisible="{Binding IsProcessing}">
+                    <TextBlock Text="PROCESSING" FontSize="9" FontWeight="Bold" Foreground="#1e1e2e"/>
+                </Border>
+                <TextBlock Text="{Binding ProcessingStatus}"
+                           FontSize="11" Foreground="#cba6f7"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding ProcessingStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+    </Grid>
+</Window>

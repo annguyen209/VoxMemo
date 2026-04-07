@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <data name="AppName"><value>E-Script</value></data>
+  <data name="AppSubtitle"><value>Ghi am cuoc hop</value></data>
+  <data name="Recording"><value>Ghi am</value></data>
+  <data name="Meetings"><value>Cuoc hop</value></data>
+  <data name="Settings"><value>Cai dat</value></data>
+  <data name="Language"><value>Ngon ngu</value></data>
+  <data name="MeetingDetails"><value>Chi tiet cuoc hop</value></data>
+  <data name="Title"><value>Tieu de</value></data>
+  <data name="EnterMeetingTitle"><value>Nhap tieu de cuoc hop...</value></data>
+  <data name="AudioDevices"><value>Thiet bi am thanh</value></data>
+  <data name="Microphone"><value>Micro</value></data>
+  <data name="SystemAudio"><value>Am thanh he thong</value></data>
+  <data name="Refresh"><value>Lam moi</value></data>
+  <data name="StartRecording"><value>Bat dau ghi</value></data>
+  <data name="Stop"><value>Dung</value></data>
+  <data name="Pause"><value>Tam dung</value></data>
+  <data name="Resume"><value>Tiep tuc</value></data>
+  <data name="ReadyToRecord"><value>San sang ghi am</value></data>
+  <data name="RecordingInProgress"><value>Dang ghi am...</value></data>
+  <data name="Paused"><value>Da tam dung</value></data>
+  <data name="RecordingSaved"><value>Da luu ban ghi</value></data>
+  <data name="SearchMeetings"><value>Tim kiem cuoc hop...</value></data>
+  <data name="SelectMeeting"><value>Chon mot cuoc hop</value></data>
+  <data name="Transcript"><value>Ban ghi chep</value></data>
+  <data name="Summary"><value>Tom tat</value></data>
+  <data name="Transcribe"><value>Chuyen doi</value></data>
+  <data name="Transcribing"><value>Dang chuyen doi...</value></data>
+  <data name="SummarizeWithAI"><value>Tom tat bang AI</value></data>
+  <data name="Summarizing"><value>Dang tom tat...</value></data>
+  <data name="AIProvider"><value>Nha cung cap AI</value></data>
+  <data name="Provider"><value>Nha cung cap</value></data>
+  <data name="OllamaURL"><value>Dia chi Ollama</value></data>
+  <data name="TestConnection"><value>Kiem tra ket noi</value></data>
+  <data name="AIModel"><value>Mo hinh AI</value></data>
+  <data name="RefreshModels"><value>Lam moi mo hinh</value></data>
+  <data name="Transcription"><value>Chuyen doi giong noi (Whisper)</value></data>
+  <data name="ActiveModel"><value>Mo hinh dang dung</value></data>
+  <data name="DownloadModel"><value>Tai mo hinh</value></data>
+  <data name="General"><value>Chung</value></data>
+  <data name="DefaultLanguage"><value>Ngon ngu mac dinh</value></data>
+</root>

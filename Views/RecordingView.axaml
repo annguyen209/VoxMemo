@@ -1,0 +1,179 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VoxMemo.ViewModels"
+             xmlns:views="using:VoxMemo.Views"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
+             x:Class="VoxMemo.Views.RecordingView"
+             x:DataType="vm:RecordingViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="32,24" Spacing="20" MaxWidth="720">
+            <!-- Header -->
+            <TextBlock Text="Recording" FontSize="28" FontWeight="Bold" Foreground="#cdd6f4"/>
+
+            <!-- Status -->
+            <Border Background="#1e1e2e" CornerRadius="8" Padding="12,10"
+                    IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontSize="13" Foreground="#fab387"/>
+            </Border>
+
+            <!-- Meeting Info -->
+            <Border Background="#1e1e2e" CornerRadius="12" Padding="24">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Meeting Details" FontSize="16" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Title" FontSize="12" Foreground="#6c7086"/>
+                        <TextBox Text="{Binding MeetingTitle}"
+                                 Watermark="Enter meeting title (or auto-generate)..."
+                                 Background="#313244" Foreground="#cdd6f4"
+                                 CornerRadius="6" Padding="12,8"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,8,0">
+                            <TextBlock Text="Platform" FontSize="12" Foreground="#6c7086"/>
+                            <ComboBox ItemsSource="{Binding Platforms}"
+                                      SelectedItem="{Binding SelectedPlatform}"
+                                      HorizontalAlignment="Stretch"
+                                      Background="#313244" Foreground="#cdd6f4"
+                                      CornerRadius="6" Padding="12,8"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Spacing="6" Margin="4,0">
+                            <TextBlock Text="Language" FontSize="12" Foreground="#6c7086"/>
+                            <ComboBox ItemsSource="{Binding Languages}"
+                                      SelectedItem="{Binding SelectedLanguage}"
+                                      HorizontalAlignment="Stretch"
+                                      Background="#313244" Foreground="#cdd6f4"
+                                      CornerRadius="6" Padding="12,8"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Spacing="6" Margin="8,0,0,0">
+                            <TextBlock Text="Live Captions" FontSize="12" Foreground="#6c7086"/>
+                            <CheckBox IsChecked="{Binding LiveCaptionsEnabled}"
+                                      IsEnabled="{Binding !IsRecording}"
+                                      Foreground="#cdd6f4" Margin="0,6,0,0">
+                                <TextBlock Text="Enable" FontSize="13"/>
+                            </CheckBox>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Audio Source -->
+            <Border Background="#1e1e2e" CornerRadius="12" Padding="24">
+                <StackPanel Spacing="16">
+                    <DockPanel>
+                        <TextBlock Text="Audio Source" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="#cdd6f4" VerticalAlignment="Center"/>
+                        <Button DockPanel.Dock="Right" Content="Refresh"
+                                Command="{Binding RefreshDevicesCommand}"
+                                Background="#313244" Foreground="#cdd6f4"
+                                CornerRadius="6" Padding="12,6" FontSize="12"
+                                HorizontalAlignment="Right"/>
+                    </DockPanel>
+
+                    <Grid ColumnDefinitions="*,2*">
+                        <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,8,0">
+                            <TextBlock Text="Source Type" FontSize="12" Foreground="#6c7086"/>
+                            <ComboBox ItemsSource="{Binding AudioSources}"
+                                      SelectedItem="{Binding SelectedAudioSource}"
+                                      HorizontalAlignment="Stretch"
+                                      Background="#313244" Foreground="#cdd6f4"
+                                      CornerRadius="6" Padding="12,8"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Spacing="6" Margin="8,0,0,0">
+                            <TextBlock Text="Device" FontSize="12" Foreground="#6c7086"/>
+                            <ComboBox ItemsSource="{Binding Devices}"
+                                      SelectedItem="{Binding SelectedDevice}"
+                                      HorizontalAlignment="Stretch"
+                                      Background="#313244" Foreground="#cdd6f4"
+                                      CornerRadius="6" Padding="12,8"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock FontSize="11" Foreground="#7f849c"
+                               Text="{Binding SelectedAudioSource,
+                                   Converter={x:Static views:RecordingView.SourceHintConverter}}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Recording Controls -->
+            <Border Background="#1e1e2e" CornerRadius="12" Padding="32">
+                <StackPanel Spacing="20" HorizontalAlignment="Center">
+                    <!-- Audio Level Bar -->
+                    <Border Background="#313244" CornerRadius="4" Height="8" Width="400">
+                        <Border Background="#a6e3a1" CornerRadius="4"
+                                HorizontalAlignment="Left"
+                                Width="{Binding AudioLevel, Converter={x:Static views:RecordingView.LevelToWidthConverter}}"/>
+                    </Border>
+
+                    <!-- Timer -->
+                    <TextBlock Text="{Binding ElapsedTime}"
+                               FontSize="48" FontWeight="Light"
+                               Foreground="#cdd6f4"
+                               HorizontalAlignment="Center"
+                               FontFamily="Consolas, Courier New"/>
+
+                    <!-- Buttons -->
+                    <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                        <Button Command="{Binding StartRecordingCommand}"
+                                IsVisible="{Binding !IsRecording}"
+                                Background="#f38ba8" Foreground="#1e1e2e"
+                                CornerRadius="24" Padding="32,12"
+                                FontSize="16" FontWeight="SemiBold">
+                            <TextBlock Text="Start Recording" VerticalAlignment="Center"/>
+                        </Button>
+
+                        <Button Command="{Binding PauseRecordingCommand}"
+                                IsVisible="{Binding IsRecording}"
+                                Background="#fab387" Foreground="#1e1e2e"
+                                CornerRadius="24" Padding="24,12"
+                                FontSize="14" FontWeight="SemiBold">
+                            <TextBlock Text="{Binding IsPaused,
+                                Converter={x:Static views:RecordingView.PauseTextConverter}}"/>
+                        </Button>
+
+                        <Button Command="{Binding StopRecordingCommand}"
+                                IsVisible="{Binding IsRecording}"
+                                Background="#eba0ac" Foreground="#1e1e2e"
+                                CornerRadius="24" Padding="24,12"
+                                FontSize="14" FontWeight="SemiBold">
+                            <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Live Captions Panel -->
+            <Border Background="#1e1e2e" CornerRadius="12" Padding="24"
+                    IsVisible="{Binding IsRecording}">
+                <StackPanel Spacing="12">
+                    <DockPanel>
+                        <TextBlock Text="Live Captions" FontSize="16" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+                        <Border DockPanel.Dock="Right" Background="#f38ba8" CornerRadius="4" Padding="8,2"
+                                HorizontalAlignment="Right">
+                            <TextBlock Text="LIVE" FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"/>
+                        </Border>
+                    </DockPanel>
+
+                    <Border Background="#313244" CornerRadius="8" Padding="16" MinHeight="80">
+                        <TextBlock Text="{Binding LiveCaptionText}"
+                                   TextWrapping="Wrap"
+                                   FontSize="15" Foreground="#cdd6f4"
+                                   Opacity="0.9"/>
+                    </Border>
+
+                    <TextBlock Text="{Binding LiveCaptionsEnabled,
+                        Converter={x:Static views:RecordingView.CaptionStatusConverter}}"
+                               FontSize="12" Foreground="#7f849c"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
