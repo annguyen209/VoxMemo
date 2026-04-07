@@ -16,7 +16,7 @@ ArchitecturesInstallIn64BitMode=x64
 WizardStyle=modern
 
 [Files]
-Source: "publish\single\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\VoxMemo"; Filename: "{app}\VoxMemo.exe"

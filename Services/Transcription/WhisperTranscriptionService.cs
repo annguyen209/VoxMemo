@@ -15,6 +15,7 @@ public class WhisperTranscriptionService : ITranscriptionService
 {
     // Global lock — ggml native library crashes if two Whisper instances run concurrently
     private static readonly SemaphoreSlim _whisperLock = new(1, 1);
+    private static bool _runtimeInitialized;
 
     private readonly string _modelsDir;
 
@@ -27,6 +28,55 @@ public class WhisperTranscriptionService : ITranscriptionService
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "VoxMemo", "models");
         Directory.CreateDirectory(_modelsDir);
+        EnsureRuntimeLoaded();
+    }
+
+    /// <summary>
+    /// Ensures the Whisper native library can be found by adding runtimes/ paths
+    /// to the DLL search directories. Needed when running from bin/Debug on some .NET versions.
+    /// </summary>
+    private static void EnsureRuntimeLoaded()
+    {
+        if (_runtimeInitialized) return;
+        _runtimeInitialized = true;
+
+        var baseDir = AppContext.BaseDirectory;
+        var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+
+        // Search for native lib directories
+        string[] candidates = [
+            Path.Combine(baseDir, "runtimes", rid),
+            Path.Combine(baseDir, "runtimes", rid, "native"),
+            .. new[] { "win-x64", "win-arm64", "linux-x64", "osx-x64", "osx-arm64" }
+                .Select(r => Path.Combine(baseDir, "runtimes", r))
+        ];
+
+        foreach (var dir in candidates)
+        {
+            if (!Directory.Exists(dir)) continue;
+
+            // Copy native libs to app base directory so Whisper.net can find them
+            foreach (var file in Directory.GetFiles(dir, "*.dll")
+                .Concat(Directory.GetFiles(dir, "*.so"))
+                .Concat(Directory.GetFiles(dir, "*.dylib")))
+            {
+                var dest = Path.Combine(baseDir, Path.GetFileName(file));
+                if (!File.Exists(dest))
+                {
+                    try
+                    {
+                        File.Copy(file, dest);
+                        Log.Debug("Copied native lib {File} to {Dest}", Path.GetFileName(file), baseDir);
+                    }
+                    catch { }
+                }
+            }
+
+            Log.Information("Whisper native libs resolved from: {Path}", dir);
+            return;
+        }
+
+        Log.Warning("Could not find Whisper native libraries in runtimes/ folder");
     }
 
     public Task<List<string>> GetAvailableModelsAsync()
