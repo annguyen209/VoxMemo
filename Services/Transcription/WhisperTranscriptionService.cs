@@ -47,8 +47,13 @@ public class WhisperTranscriptionService : ITranscriptionService
         string[] candidates = [
             Path.Combine(baseDir, "runtimes", rid),
             Path.Combine(baseDir, "runtimes", rid, "native"),
+            // Vulkan runtime paths
+            Path.Combine(baseDir, "runtimes", "vulkan", rid),
             .. new[] { "win-x64", "win-arm64", "linux-x64", "osx-x64", "osx-arm64" }
-                .Select(r => Path.Combine(baseDir, "runtimes", r))
+                .SelectMany(r => new[] {
+                    Path.Combine(baseDir, "runtimes", r),
+                    Path.Combine(baseDir, "runtimes", "vulkan", r),
+                })
         ];
 
         foreach (var dir in candidates)
