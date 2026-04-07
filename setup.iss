@@ -19,9 +19,10 @@ WizardStyle=modern
 Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
-Name: "{group}\VoxMemo"; Filename: "{app}\VoxMemo.exe"
+; Start Menu shortcut with AppUserModelID for modern toast notifications
+Name: "{group}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; AppUserModelID: "Anzdev4life.VoxMemo"
 Name: "{group}\Uninstall VoxMemo"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; Tasks: desktopicon
+Name: "{autodesktop}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; Tasks: desktopicon; AppUserModelID: "Anzdev4life.VoxMemo"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
