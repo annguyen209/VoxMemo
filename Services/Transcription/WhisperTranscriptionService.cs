@@ -95,7 +95,7 @@ public class WhisperTranscriptionService : ITranscriptionService
         {
             Log.Information("Converting {Ext} to WAV before transcription: {Path}", ext, audioPath);
             tempWav = Path.Combine(Path.GetTempPath(), $"voxmemo_convert_{Guid.NewGuid():N}.wav");
-            Audio.AudioConverter.ConvertToWhisperFormat(audioPath, tempWav);
+            Platform.PlatformServices.AudioConverter.ConvertToWhisperFormat(audioPath, tempWav);
             audioPath = tempWav;
         }
 

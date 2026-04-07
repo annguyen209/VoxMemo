@@ -172,7 +172,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
     partial void OnStartWithWindowsChanged(bool value)
     {
-        if (!_isLoading) SetWindowsStartup(value);
+        if (!_isLoading) Services.Platform.PlatformServices.Startup.SetStartupEnabled(value);
     }
     partial void OnDefaultLanguageChanged(string value) => SaveIfNotLoading();
     partial void OnStoragePathChanged(string value) => SaveIfNotLoading();
@@ -202,7 +202,7 @@ public partial class SettingsViewModel : ViewModelBase
             RecordingHotkey = await GetSettingAsync(db, "recording_hotkey", "Ctrl+Shift+R");
             CustomSummaryPrompt = await GetSettingAsync(db, "custom_summary_prompt", string.Empty);
             CustomSpeakerPrompt = await GetSettingAsync(db, "custom_speaker_prompt", string.Empty);
-            StartWithWindows = GetWindowsStartup();
+            StartWithWindows = Services.Platform.PlatformServices.Startup.IsStartupEnabled();
             var langCodes = await GetSettingAsync(db, "enabled_languages", "en,vi");
             EnabledLanguages = new ObservableCollection<Models.LanguageItem>(
                 Models.WhisperLanguages.All.FindAll(l => langCodes.Split(',').Contains(l.Code)));
@@ -458,38 +458,6 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private static bool GetWindowsStartup()
-    {
-        try
-        {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
-            return key?.GetValue("VoxMemo") != null;
-        }
-        catch { return false; }
-    }
-
-    private static void SetWindowsStartup(bool enable)
-    {
-        try
-        {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-            if (key == null) return;
-
-            if (enable)
-            {
-                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                if (exePath != null)
-                    key.SetValue("VoxMemo", $"\"{exePath}\"");
-            }
-            else
-            {
-                key.DeleteValue("VoxMemo", false);
-            }
-        }
-        catch { }
-    }
 }
 
 public record PromptTemplate(string Name, string Prompt)

@@ -585,33 +585,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public static void ShowTrayNotification(string title, string message)
     {
-        try
-        {
-            var escapedTitle = title.Replace("'", "''");
-            var escapedMsg = message.Replace("'", "''");
-            var script = $@"
-                [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null;
-                [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null;
-                $xml = '<toast><visual><binding template=""ToastGeneric""><text>{escapedTitle}</text><text>{escapedMsg}</text></binding></visual></toast>';
-                $doc = New-Object Windows.Data.Xml.Dom.XmlDocument;
-                $doc.LoadXml($xml);
-                $toast = [Windows.UI.Notifications.ToastNotification]::new($doc);
-                [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('VoxMemo').Show($toast);
-            ";
-
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "powershell",
-                Arguments = $"-NoProfile -NonInteractive -Command \"{script.Replace("\"", "\\\"")}\"",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-            };
-            System.Diagnostics.Process.Start(psi);
-        }
-        catch (Exception ex)
-        {
-            Log.Debug("Toast notification failed: {Error}", ex.Message);
-        }
+        Services.Platform.PlatformServices.Notifications.ShowNotification(title, message);
     }
 
     private void SetStatus(string status, bool processing = true)

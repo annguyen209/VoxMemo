@@ -7,11 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using NAudio.Wave;
 using Serilog;
 using VoxMemo.Models;
 using VoxMemo.Services.AI;
 using VoxMemo.Services.Database;
+using VoxMemo.Services.Platform;
 using VoxMemo.Services.Transcription;
 using Microsoft.EntityFrameworkCore;
 
@@ -236,8 +236,7 @@ public partial class MeetingsViewModel : ViewModelBase
         long durationMs = 0;
         try
         {
-            using var reader = new AudioFileReader(sourcePath);
-            durationMs = (long)reader.TotalTime.TotalMilliseconds;
+            durationMs = (long)PlatformServices.AudioConverter.GetDuration(sourcePath).TotalMilliseconds;
         }
         catch { }
 
@@ -247,12 +246,12 @@ public partial class MeetingsViewModel : ViewModelBase
             {
                 File.Copy(sourcePath, destPath, true);
                 // Convert in-place to Whisper format
-                await Task.Run(() => Services.Audio.AudioConverter.ConvertInPlace(destPath));
+                await Task.Run(() => PlatformServices.AudioConverter.ConvertInPlace(destPath));
             }
             else
             {
                 // Convert any format (mp3, m4a, ogg, flac, etc.) to Whisper WAV
-                await Task.Run(() => Services.Audio.AudioConverter.ConvertToWhisperFormat(sourcePath, destPath));
+                await Task.Run(() => PlatformServices.AudioConverter.ConvertToWhisperFormat(sourcePath, destPath));
             }
         }
         catch (Exception ex)
@@ -360,8 +359,7 @@ public partial class MeetingItemViewModel : ViewModelBase
     private int _selectedTabIndex;
 
     // Audio playback
-    private WaveOutEvent? _waveOut;
-    private AudioFileReader? _audioFileReader;
+    private IAudioPlaybackService? _player;
     private CancellationTokenSource? _playbackTimerCts;
     private bool _isSeeking;
 
@@ -584,35 +582,31 @@ public partial class MeetingItemViewModel : ViewModelBase
     {
         if (IsPlaying) return;
 
-        // Resume from pause
-        if (IsPlaybackPaused && _waveOut != null)
+        if (IsPlaybackPaused && _player?.IsInitialized == true)
         {
-            _waveOut.Play();
+            _player.Play();
             IsPlaying = true;
             IsPlaybackPaused = false;
             return;
         }
 
-        // Start fresh
         if (string.IsNullOrEmpty(AudioPath) || !File.Exists(AudioPath)) return;
 
         try
         {
-            _audioFileReader = new AudioFileReader(AudioPath);
-            _waveOut = new WaveOutEvent();
-            _waveOut.Init(_audioFileReader);
-            _waveOut.PlaybackStopped += (_, _) =>
+            _player = PlatformServices.CreatePlaybackService();
+            _player.PlaybackStopped += (_, _) =>
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    // Only fully stop if we didn't pause
                     if (!IsPlaybackPaused)
                         StopAudioInternal();
                 });
             };
+            _player.Init(AudioPath);
 
-            PlaybackTotalSeconds = _audioFileReader.TotalTime.TotalSeconds;
-            _waveOut.Play();
+            PlaybackTotalSeconds = _player.TotalTime.TotalSeconds;
+            _player.Play();
             IsPlaying = true;
             IsPlaybackActive = true;
             IsPlaybackPaused = false;
@@ -629,9 +623,9 @@ public partial class MeetingItemViewModel : ViewModelBase
     [RelayCommand]
     private void PauseAudio()
     {
-        if (!IsPlaying || _waveOut == null) return;
+        if (!IsPlaying || _player == null) return;
 
-        _waveOut.Pause();
+        _player.Pause();
         IsPlaying = false;
         IsPlaybackPaused = true;
     }
@@ -648,12 +642,8 @@ public partial class MeetingItemViewModel : ViewModelBase
         _playbackTimerCts?.Dispose();
         _playbackTimerCts = null;
 
-        _waveOut?.Stop();
-        _waveOut?.Dispose();
-        _waveOut = null;
-
-        _audioFileReader?.Dispose();
-        _audioFileReader = null;
+        _player?.Dispose();
+        _player = null;
 
         IsPlaying = false;
         IsPlaybackPaused = false;
@@ -665,9 +655,9 @@ public partial class MeetingItemViewModel : ViewModelBase
 
     partial void OnPlaybackCurrentSecondsChanged(double value)
     {
-        if (_isSeeking && _audioFileReader != null)
+        if (_isSeeking && _player?.IsInitialized == true)
         {
-            try { _audioFileReader.CurrentTime = TimeSpan.FromSeconds(value); } catch { }
+            _player.CurrentTime = TimeSpan.FromSeconds(value);
         }
     }
 
@@ -675,35 +665,30 @@ public partial class MeetingItemViewModel : ViewModelBase
 
     public void EndSeek()
     {
-        if (_audioFileReader != null)
+        if (_player?.IsInitialized == true)
         {
-            try { _audioFileReader.CurrentTime = TimeSpan.FromSeconds(PlaybackCurrentSeconds); } catch { }
+            _player.CurrentTime = TimeSpan.FromSeconds(PlaybackCurrentSeconds);
         }
         _isSeeking = false;
     }
 
-    /// <summary>Seek to a position by clicking on the slider track (not dragging).</summary>
     public void SeekTo(double seconds)
     {
-        if (_audioFileReader != null && IsPlaybackActive)
+        if (_player?.IsInitialized == true && IsPlaybackActive)
         {
-            try
-            {
-                _audioFileReader.CurrentTime = TimeSpan.FromSeconds(seconds);
-                PlaybackCurrentSeconds = seconds;
-            }
-            catch { }
+            _player.CurrentTime = TimeSpan.FromSeconds(seconds);
+            PlaybackCurrentSeconds = seconds;
         }
     }
 
     private async Task UpdatePlaybackPositionAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested && _audioFileReader != null)
+        while (!ct.IsCancellationRequested && _player?.IsInitialized == true)
         {
             try
             {
-                var current = _audioFileReader.CurrentTime;
-                var total = _audioFileReader.TotalTime;
+                var current = _player.CurrentTime;
+                var total = _player.TotalTime;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     if (!_isSeeking)

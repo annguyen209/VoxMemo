@@ -27,6 +27,10 @@ sealed class Program
 
         Log.Information("VoxMemo starting");
 
+        // Initialize platform-specific services before anything else
+        VoxMemo.Services.Platform.PlatformServices.Initialize();
+        Log.Information("Platform services initialized for {OS}", System.Runtime.InteropServices.RuntimeInformation.OSDescription);
+
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             Log.Fatal(e.ExceptionObject as Exception, "Unhandled domain exception");

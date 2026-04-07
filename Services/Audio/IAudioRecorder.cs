@@ -26,4 +26,10 @@ public interface IAudioRecorder
     bool IsRecording { get; }
     bool IsPaused { get; }
     TimeSpan Elapsed { get; }
+
+    /// <summary>Creates a snapshot of recent audio for live transcription. Returns file path or null.</summary>
+    string? CreateSnapshotForTranscription(string tempDir);
+
+    /// <summary>Diagnostic info when CreateSnapshotForTranscription returns null.</summary>
+    string? LastSnapshotError { get; }
 }

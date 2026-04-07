@@ -12,6 +12,7 @@ using VoxMemo.Models;
 using Serilog;
 using VoxMemo.Services.Audio;
 using VoxMemo.Services.Database;
+using VoxMemo.Services.Platform;
 using VoxMemo.Services.Transcription;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ namespace VoxMemo.ViewModels;
 
 public partial class RecordingViewModel : ViewModelBase
 {
-    private AudioRecorderService? _recorder;
+    private IAudioRecorder? _recorder;
     private DispatcherTimer? _timer;
     private string? _currentAudioPath;
     private DateTime _recordingStartedAt;
@@ -99,7 +100,7 @@ public partial class RecordingViewModel : ViewModelBase
         }
         catch { }
 
-        _recorder = new AudioRecorderService();
+        _recorder = Services.Platform.PlatformServices.AudioRecorder;
         _recorder.AudioLevelChanged += (_, level) =>
         {
             Dispatcher.UIThread.Post(() => AudioLevel = level);
@@ -358,7 +359,7 @@ public partial class RecordingViewModel : ViewModelBase
         try
         {
             StatusMessage = "Converting audio format...";
-            await Task.Run(() => AudioConverter.ConvertInPlace(_currentAudioPath));
+            await Task.Run(() => Services.Platform.PlatformServices.AudioConverter.ConvertInPlace(_currentAudioPath));
             Log.Information("Audio converted successfully");
         }
         catch (Exception ex)

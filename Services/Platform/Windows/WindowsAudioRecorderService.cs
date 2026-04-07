@@ -8,9 +8,11 @@ using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Serilog;
 
-namespace VoxMemo.Services.Audio;
+using VoxMemo.Services.Audio;
 
-public class AudioRecorderService : IAudioRecorder, IDisposable
+namespace VoxMemo.Services.Platform.Windows;
+
+public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
 {
     private WasapiCapture? _capture;
     private WaveFileWriter? _writer;
@@ -207,7 +209,7 @@ public class AudioRecorderService : IAudioRecorder, IDisposable
             // Try conversion, fall back to raw file if it fails
             try
             {
-                AudioConverter.ConvertToWhisperFormat(rawPath, convertedPath);
+                new WindowsAudioConverter().ConvertToWhisperFormat(rawPath, convertedPath);
                 try { File.Delete(rawPath); } catch { }
 
                 var convertedInfo = new FileInfo(convertedPath);

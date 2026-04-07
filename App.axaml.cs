@@ -6,8 +6,6 @@ using Avalonia.Data.Core.Plugins;
 using System;
 using System.ComponentModel;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
 using Serilog;
@@ -20,7 +18,6 @@ namespace VoxMemo;
 public partial class App : Application
 {
     private MainWindowViewModel? _mainVm;
-    private GlobalHotkey? _hotkey;
 
     public override void Initialize()
     {
@@ -62,7 +59,7 @@ public partial class App : Application
 
             desktop.ShutdownRequested += (_, _) =>
             {
-                _hotkey?.Dispose();
+                Services.Platform.PlatformServices.GlobalHotkey.Dispose();
             };
         }
 
@@ -241,8 +238,8 @@ public partial class App : Application
 
     private void RegisterHotkey(string hotkeyStr)
     {
-        _hotkey?.Dispose();
-        _hotkey = new GlobalHotkey();
+        var hotkey = Services.Platform.PlatformServices.GlobalHotkey;
+        hotkey.Dispose(); // unregister previous
 
         var (modifiers, vk) = ParseHotkey(hotkeyStr);
         if (vk == 0)
@@ -251,7 +248,7 @@ public partial class App : Application
             return;
         }
 
-        _hotkey.Register(modifiers, vk, OnToggleRecordingHotkey);
+        hotkey.Register(modifiers, vk, OnToggleRecordingHotkey);
         Log.Information("Global hotkey registered: {Hotkey}", hotkeyStr);
     }
 
@@ -265,10 +262,10 @@ public partial class App : Application
         {
             switch (part)
             {
-                case "ctrl" or "control": modifiers |= GlobalHotkey.MOD_CONTROL; break;
-                case "shift": modifiers |= GlobalHotkey.MOD_SHIFT; break;
-                case "alt": modifiers |= GlobalHotkey.MOD_ALT; break;
-                case "win": modifiers |= GlobalHotkey.MOD_WIN; break;
+                case "ctrl" or "control": modifiers |= Services.Platform.IGlobalHotkeyService.MOD_CONTROL; break;
+                case "shift": modifiers |= Services.Platform.IGlobalHotkeyService.MOD_SHIFT; break;
+                case "alt": modifiers |= Services.Platform.IGlobalHotkeyService.MOD_ALT; break;
+                case "win": modifiers |= Services.Platform.IGlobalHotkeyService.MOD_WIN; break;
                 default:
                     if (part.Length == 1 && char.IsLetterOrDigit(part[0]))
                         vk = char.ToUpper(part[0]);
@@ -311,83 +308,5 @@ public partial class App : Application
         {
             BindingPlugins.DataValidators.Remove(plugin);
         }
-    }
-}
-
-/// <summary>
-/// Windows global hotkey using RegisterHotKey/UnregisterHotKey.
-/// </summary>
-internal sealed class GlobalHotkey : IDisposable
-{
-    public const int MOD_ALT = 0x0001;
-    public const int MOD_CONTROL = 0x0002;
-    public const int MOD_SHIFT = 0x0004;
-    public const int MOD_WIN = 0x0008;
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vk);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-    [DllImport("user32.dll")]
-    private static extern bool PeekMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MSG
-    {
-        public IntPtr hwnd;
-        public uint message;
-        public IntPtr wParam;
-        public IntPtr lParam;
-        public uint time;
-        public int pt_x;
-        public int pt_y;
-    }
-
-    private const int WM_HOTKEY = 0x0312;
-    private const int HOTKEY_ID = 9000;
-    private Thread? _thread;
-    private volatile bool _running;
-    private Action? _callback;
-
-    public void Register(int modifiers, int vk, Action callback)
-    {
-        _callback = callback;
-        _running = true;
-
-        _thread = new Thread(() =>
-        {
-            if (!RegisterHotKey(IntPtr.Zero, HOTKEY_ID, modifiers, vk))
-            {
-                Log.Warning("Failed to register global hotkey");
-                return;
-            }
-
-            while (_running)
-            {
-                if (PeekMessage(out var msg, IntPtr.Zero, WM_HOTKEY, WM_HOTKEY, 1))
-                {
-                    if (msg.message == WM_HOTKEY)
-                    {
-                        _callback?.Invoke();
-                    }
-                }
-                Thread.Sleep(50);
-            }
-
-            UnregisterHotKey(IntPtr.Zero, HOTKEY_ID);
-        })
-        {
-            IsBackground = true,
-            Name = "GlobalHotkeyThread"
-        };
-        _thread.Start();
-    }
-
-    public void Dispose()
-    {
-        _running = false;
-        _thread?.Join(2000);
     }
 }
