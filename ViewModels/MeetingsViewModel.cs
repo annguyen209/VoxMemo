@@ -270,11 +270,6 @@ public partial class MeetingsViewModel : ViewModelBase
         content.Children.Add(langCombo);
 
         // Transcript
-        content.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = "Transcript", FontSize = 12,
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-        });
         var textBox = new Avalonia.Controls.TextBox
         {
             Watermark = "Paste or type the transcript here...",
@@ -287,6 +282,52 @@ public partial class MeetingsViewModel : ViewModelBase
             CornerRadius = new Avalonia.CornerRadius(6),
             Padding = new Avalonia.Thickness(12, 8),
         };
+        // Import from file button
+        var importBtn = new Avalonia.Controls.Button
+        {
+            Content = "Import from File",
+            Background = Avalonia.Media.Brush.Parse("#313244"),
+            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+            Padding = new Avalonia.Thickness(12, 6),
+            CornerRadius = new Avalonia.CornerRadius(6),
+            FontSize = 12,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+        };
+        importBtn.Click += async (_, _) =>
+        {
+            var files = await desktop.MainWindow.StorageProvider.OpenFilePickerAsync(
+                new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = "Select text file",
+                    AllowMultiple = false,
+                    FileTypeFilter =
+                    [
+                        new Avalonia.Platform.Storage.FilePickerFileType("Text files")
+                        {
+                            Patterns = ["*.txt", "*.md", "*.srt", "*.vtt", "*.csv", "*.log"]
+                        }
+                    ]
+                });
+            if (files.Count > 0)
+            {
+                var filePath = files[0].Path.LocalPath;
+                textBox.Text = await System.IO.File.ReadAllTextAsync(filePath);
+                if (string.IsNullOrWhiteSpace(titleBox.Text))
+                    titleBox.Text = System.IO.Path.GetFileNameWithoutExtension(filePath);
+            }
+        };
+
+        var textRow = new Avalonia.Controls.DockPanel();
+        textRow.Children.Add(new Avalonia.Controls.TextBlock
+        {
+            Text = "Transcript", FontSize = 12,
+            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        });
+        Avalonia.Controls.DockPanel.SetDock(importBtn, Avalonia.Controls.Dock.Right);
+        textRow.Children.Add(importBtn);
+        content.Children.Add(textRow);
+
         content.Children.Add(textBox);
 
         // Buttons
