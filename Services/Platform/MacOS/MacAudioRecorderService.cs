@@ -19,13 +19,16 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
     private readonly Stopwatch _stopwatch = new();
     private bool _isPaused;
 
+    private string? _lastSnapshotError;
+    private string? _currentOutputPath;
+
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
 
     public bool IsRecording => _recordProcess != null && !_recordProcess.HasExited;
     public bool IsPaused => _isPaused;
     public TimeSpan Elapsed => _stopwatch.Elapsed;
-    public string? LastSnapshotError => "Live captions not yet supported on macOS";
+    public string? LastSnapshotError => _lastSnapshotError;
 
     public List<AudioDevice> GetInputDevices()
     {
@@ -76,6 +79,7 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
             _recordProcess.Start();
             _stopwatch.Restart();
             _isPaused = false;
+            _currentOutputPath = outputPath;
 
             Log.Information("macOS recording started: device={Device} output={Path}", deviceId, outputPath);
         }
@@ -130,7 +134,53 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
         }
     }
 
-    public string? CreateSnapshotForTranscription(string tempDir) => null;
+    public string? CreateSnapshotForTranscription(string tempDir)
+    {
+        if (string.IsNullOrEmpty(_currentOutputPath) || !File.Exists(_currentOutputPath))
+        {
+            _lastSnapshotError = "No recording file available";
+            return null;
+        }
+
+        if (new FileInfo(_currentOutputPath).Length < 16000)
+        {
+            _lastSnapshotError = "Recording file too small";
+            return null;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var snapshotPath = Path.Combine(tempDir, $"caption_{Guid.NewGuid():N}.wav");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-sseof -10 -i \"{_currentOutputPath}\" -ar 16000 -ac 1 -sample_fmt s16 -y \"{snapshotPath}\"",
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null) { _lastSnapshotError = "Failed to start ffmpeg"; return null; }
+            proc.WaitForExit(10000);
+
+            if (File.Exists(snapshotPath) && new FileInfo(snapshotPath).Length > 1000)
+            {
+                _lastSnapshotError = null;
+                return snapshotPath;
+            }
+
+            _lastSnapshotError = $"ffmpeg snapshot failed (exit {proc.ExitCode})";
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _lastSnapshotError = $"Snapshot failed: {ex.Message}";
+            return null;
+        }
+    }
 
     private static List<AudioDevice> ParseAvfoundationDevices(string output, string type)
     {

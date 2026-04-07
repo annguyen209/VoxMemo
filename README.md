@@ -62,10 +62,39 @@ A desktop meeting recorder with local transcription, speaker identification, and
 
 ## Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | Required to build and run |
-| [Ollama](https://ollama.com) | Optional -- for local AI summarization |
+| Requirement | Windows | Linux | macOS |
+|---|---|---|---|
+| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | Required | Required | Required |
+| ffmpeg + ffprobe | Optional (import only) | **Required** | **Required** |
+| PulseAudio (parecord) | -- | **Required** (recording) | -- |
+| ffplay | -- | Recommended (playback) | -- |
+| notify-send | -- | Recommended (notifications) | -- |
+| [BlackHole](https://github.com/ExistentialAudio/BlackHole) | -- | -- | Required for system audio |
+| [Ollama](https://ollama.com) | Optional | Optional | Optional |
+
+### Platform install commands
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt install ffmpeg pulseaudio-utils libnotify-bin
+```
+
+**Linux (Fedora):**
+```bash
+sudo dnf install ffmpeg pulseaudio-utils libnotify
+```
+
+**Linux (Arch):**
+```bash
+sudo pacman -S ffmpeg pulseaudio libnotify
+```
+
+**macOS:**
+```bash
+brew install ffmpeg
+# For system audio capture, install BlackHole:
+# https://github.com/ExistentialAudio/BlackHole
+```
 
 OpenAI, Anthropic, LM Studio, or any OpenAI-compatible API can be used instead of Ollama.
 
@@ -93,10 +122,26 @@ cd ../VoxMemoTests
 dotnet test
 ```
 
-### Publish a self-contained binary
+### Build all platforms
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained
+./build.sh
+```
+
+Or build individually:
+
+```bash
+# Windows
+dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+
+# Linux
+dotnet publish -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
+
+# macOS (Intel)
+dotnet publish -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true
+
+# macOS (Apple Silicon)
+dotnet publish -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true
 ```
 
 ## First-Time Setup
@@ -152,8 +197,18 @@ VoxMemo/
       AiProviderFactory.cs      Creates provider from settings
       PromptTemplates.cs        Prompt definitions (with custom override)
     Audio/
-      AudioRecorderService.cs   NAudio recording (mic + loopback)
-      AudioConverter.cs         Format conversion to Whisper WAV
+      IAudioRecorder.cs         Audio recorder interface
+    Platform/
+      PlatformServices.cs       Central factory (runtime OS detection)
+      IAudioConverter.cs        Audio conversion interface
+      IAudioPlaybackService.cs  Playback interface
+      IGlobalHotkeyService.cs   Hotkey interface
+      INotificationService.cs   Notification interface
+      IStartupService.cs        Auto-start interface
+      Windows/                  NAudio, Registry, P/Invoke implementations
+      Linux/                    PulseAudio, ffmpeg, notify-send implementations
+      MacOS/                    avfoundation, afplay, osascript implementations
+      Stub/                     Safe fallbacks for unsupported features
     Database/
       AppDbContext.cs            EF Core SQLite context
     Transcription/
@@ -181,16 +236,32 @@ VoxMemoTests/                   xUnit test project (65 tests)
 |---|---|---|
 | UI framework | Avalonia UI 11.3 | Cross-platform desktop |
 | MVVM | CommunityToolkit.Mvvm 8.2 | Source generators |
-| Audio | NAudio 2.2 | Recording + playback |
-| Transcription | Whisper.net 1.8 | Local speech-to-text |
+| Audio (Windows) | NAudio 2.2 | WASAPI recording + WaveOut playback |
+| Audio (Linux) | PulseAudio + ffmpeg | parecord + ffplay |
+| Audio (macOS) | ffmpeg + afplay | avfoundation recording |
+| Transcription | Whisper.net 1.8 | Local speech-to-text (all platforms) |
 | AI (Ollama) | Direct HTTP | Replaced OllamaSharp for stability |
 | Database | EF Core + SQLite 9.0 | Settings + meeting storage |
 | Logging | Serilog 4.x | File + console sinks |
 | Runtime | .NET 10 | |
 
+## Supported Platforms
+
+| Platform | Recording | System Audio | Playback | Hotkey | Auto-start |
+|---|---|---|---|---|---|
+| Windows 10/11 (x64) | NAudio WASAPI | Loopback | NAudio | Ctrl+Shift+R | Registry |
+| Linux x64 | PulseAudio | Monitor source | ffplay | -- | XDG autostart |
+| macOS x64/arm64 | ffmpeg | BlackHole required | afplay | -- | LaunchAgent |
+
 ## Logs
 
-Logs are stored at `%AppData%/VoxMemo/logs/voxmemo-YYYYMMDD.log` with 7-day retention.
+Logs are stored with daily rotation and 7-day retention:
+
+| Platform | Path |
+|---|---|
+| Windows | `%AppData%\VoxMemo\logs\` |
+| Linux | `~/.config/VoxMemo/logs/` |
+| macOS | `~/Library/Application Support/VoxMemo/logs/` |
 
 ## License
 

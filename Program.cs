@@ -29,6 +29,7 @@ sealed class Program
 
         // Initialize platform-specific services before anything else
         VoxMemo.Services.Platform.PlatformServices.Initialize();
+        VoxMemo.Services.Platform.PlatformServices.ValidateDependencies();
         Log.Information("Platform services initialized for {OS}", System.Runtime.InteropServices.RuntimeInformation.OSDescription);
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>

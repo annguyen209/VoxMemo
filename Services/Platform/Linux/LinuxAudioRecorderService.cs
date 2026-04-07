@@ -19,8 +19,7 @@ public class LinuxAudioRecorderService : IAudioRecorder, IDisposable
     private readonly Stopwatch _stopwatch = new();
     private bool _isPaused;
     private string? _lastSnapshotError;
-    private readonly List<byte> _buffer = [];
-    private readonly object _bufferLock = new();
+    private string? _currentOutputPath;
 
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
@@ -99,6 +98,7 @@ public class LinuxAudioRecorderService : IAudioRecorder, IDisposable
             _recordProcess.Start();
             _stopwatch.Restart();
             _isPaused = false;
+            _currentOutputPath = outputPath;
 
             Log.Information("Linux recording started: device={Device} output={Path}", deviceId, outputPath);
         }
@@ -155,8 +155,51 @@ public class LinuxAudioRecorderService : IAudioRecorder, IDisposable
 
     public string? CreateSnapshotForTranscription(string tempDir)
     {
-        _lastSnapshotError = "Live captions not yet supported on Linux";
-        return null;
+        if (string.IsNullOrEmpty(_currentOutputPath) || !File.Exists(_currentOutputPath))
+        {
+            _lastSnapshotError = "No recording file available";
+            return null;
+        }
+
+        if (new FileInfo(_currentOutputPath).Length < 16000) // ~0.5s of 16kHz audio
+        {
+            _lastSnapshotError = "Recording file too small";
+            return null;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var snapshotPath = Path.Combine(tempDir, $"caption_{Guid.NewGuid():N}.wav");
+
+            // Extract last 10 seconds from the in-progress recording file
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-sseof -10 -i \"{_currentOutputPath}\" -ar 16000 -ac 1 -sample_fmt s16 -y \"{snapshotPath}\"",
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null) { _lastSnapshotError = "Failed to start ffmpeg"; return null; }
+            proc.WaitForExit(10000);
+
+            if (File.Exists(snapshotPath) && new FileInfo(snapshotPath).Length > 1000)
+            {
+                _lastSnapshotError = null;
+                return snapshotPath;
+            }
+
+            _lastSnapshotError = $"ffmpeg snapshot failed (exit {proc.ExitCode})";
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _lastSnapshotError = $"Snapshot failed: {ex.Message}";
+            return null;
+        }
     }
 
     private static string RunCommand(string fileName, string arguments)

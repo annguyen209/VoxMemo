@@ -201,14 +201,15 @@
                     <TextBlock Text="When checked, Smart Process runs with previously selected steps without showing the dialog. Uncheck to reset."
                                FontSize="11" Foreground="#7f849c" TextWrapping="Wrap"/>
 
-                    <Border Height="1" Background="#313244" Margin="0,4"/>
-                    <StackPanel Spacing="6">
+                    <Border Height="1" Background="#313244" Margin="0,4"
+                            IsVisible="{Binding IsGlobalHotkeySupported}"/>
+                    <StackPanel Spacing="6" IsVisible="{Binding IsGlobalHotkeySupported}">
                         <TextBlock Text="Recording Hotkey" FontSize="12" Foreground="#bac2de"/>
                         <TextBox Text="{Binding RecordingHotkey}"
                                  Background="#313244" Foreground="#cdd6f4"
                                  CornerRadius="6" Padding="12,8"
                                  Watermark="Ctrl+Shift+R"/>
-                        <TextBlock Text="Global hotkey to start/stop recording. Use format: Ctrl+Shift+R, Alt+F9, etc. Restart may be required."
+                        <TextBlock Text="Global hotkey to start/stop recording. Use format: Ctrl+Shift+R, Alt+F9, etc."
                                    FontSize="11" Foreground="#7f849c" TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
@@ -321,8 +322,9 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <CheckBox IsChecked="{Binding StartWithWindows}" Foreground="#cdd6f4">
-                        <TextBlock Text="Start VoxMemo when Windows starts" FontSize="13"/>
+                    <CheckBox IsChecked="{Binding StartWithWindows}" Foreground="#cdd6f4"
+                              IsVisible="{Binding IsStartupSupported}">
+                        <TextBlock Text="{Binding StartupLabel}" FontSize="13"/>
                     </CheckBox>
 
                     <StackPanel Spacing="6">

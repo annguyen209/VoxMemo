@@ -55,7 +55,7 @@ public partial class RecordingViewModel : ViewModelBase
     private AudioDeviceItem? _selectedDevice;
 
     [ObservableProperty]
-    private string _statusMessage = "Ready to record";
+    private string _statusMessage = Services.Platform.PlatformServices.DependencyWarning ?? "Ready to record";
 
     [ObservableProperty]
     private string _selectedPlatform = "Other";

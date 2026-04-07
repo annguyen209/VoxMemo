@@ -16,6 +16,18 @@ namespace VoxMemo.ViewModels;
 
 public partial class SettingsViewModel : ViewModelBase
 {
+    // Platform awareness
+    public bool IsGlobalHotkeySupported { get; } =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+
+    public bool IsStartupSupported { get; } =
+        Services.Platform.PlatformServices.Startup?.IsSupported ?? false;
+
+    public string StartupLabel { get; } =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+            ? "Start VoxMemo when Windows starts"
+            : "Start VoxMemo at login";
+
     // AI Provider Settings
     [ObservableProperty]
     private string _selectedAiProvider = "Ollama";
