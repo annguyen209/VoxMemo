@@ -7,6 +7,7 @@
     <RootNamespace>VoxMemo</RootNamespace>
     <AssemblyName>VoxMemo</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <NoWarn>CA1416;CA2024</NoWarn>
     <ApplicationIcon>Assets\voxmemo-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -33,7 +34,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Serilog" Version="4.*" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.*" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.*" />
     <PackageReference Include="Whisper.net" Version="1.8.0" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.8.0" />

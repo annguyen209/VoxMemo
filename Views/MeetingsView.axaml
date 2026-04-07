@@ -69,6 +69,9 @@
                                                FontSize="11" Foreground="#bac2de"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                    <Border Background="#f9e2af" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="{Binding Language}" FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"/>
+                                    </Border>
                                     <Border Background="#89b4fa" CornerRadius="4" Padding="6,2"
                                             IsVisible="{Binding HasTranscript}">
                                         <TextBlock Text="T" FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"/>
