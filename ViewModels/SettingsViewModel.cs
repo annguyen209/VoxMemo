@@ -59,7 +59,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private ObservableCollection<string> _downloadableWhisperModels =
-        ["tiny", "base", "small", "medium", "large"];
+        ["tiny", "base", "small", "medium", "large-v3-turbo", "large-v3"];
 
     [ObservableProperty]
     private bool _isDownloadingModel;

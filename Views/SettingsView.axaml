@@ -120,7 +120,7 @@
                                   HorizontalAlignment="Stretch"
                                   Background="#313244" Foreground="#cdd6f4"
                                   CornerRadius="6" Padding="12,8"/>
-                        <TextBlock Text="Recommended: tiny (fast, stable). Larger models (small, medium) may be unstable on some systems but produce more accurate results."
+                        <TextBlock Text="Recommended: tiny for speed, large-v3-turbo for best quality (especially non-English languages like Vietnamese, Chinese, Japanese). Turbo is 6x faster than large-v3 with similar accuracy."
                                    FontSize="11" Foreground="#7f849c" TextWrapping="Wrap"/>
                     </StackPanel>
 
@@ -149,9 +149,13 @@
                             <Button Content="medium (~1.5GB)"
                                     Command="{Binding DownloadWhisperModelCommand}"
                                     CommandParameter="medium"/>
-                            <Button Content="large (~3GB)"
+                            <Button Content="large-v3-turbo (~800MB)"
                                     Command="{Binding DownloadWhisperModelCommand}"
-                                    CommandParameter="large"/>
+                                    CommandParameter="large-v3-turbo"
+                                    Background="#cba6f7" Foreground="#1e1e2e"/>
+                            <Button Content="large-v3 (~3GB)"
+                                    Command="{Binding DownloadWhisperModelCommand}"
+                                    CommandParameter="large-v3"/>
                         </WrapPanel>
                         <TextBlock Text="{Binding DownloadProgress}" FontSize="12" Foreground="#a6e3a1"
                                    IsVisible="{Binding IsDownloadingModel}"/>

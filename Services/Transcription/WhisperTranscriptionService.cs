@@ -99,7 +99,9 @@ public class WhisperTranscriptionService : ITranscriptionService
             "base" => GgmlType.Base,
             "small" => GgmlType.Small,
             "medium" => GgmlType.Medium,
+            "large-v2" => GgmlType.LargeV2,
             "large" or "large-v3" => GgmlType.LargeV3,
+            "large-v3-turbo" => GgmlType.LargeV3Turbo,
             _ => GgmlType.Base
         };
 
