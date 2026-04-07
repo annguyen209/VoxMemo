@@ -71,7 +71,8 @@ public class OpenAiProvider : IAiProvider
                 new { role = "system", content = systemPrompt },
                 new { role = "user", content = $"Transcript:\n{transcript}" }
             },
-            temperature = 0.3
+            temperature = 0.3,
+            stream = false
         };
 
         var json = JsonSerializer.Serialize(request);
@@ -86,7 +87,27 @@ public class OpenAiProvider : IAiProvider
             throw new HttpRequestException($"API returned {(int)response.StatusCode} {response.ReasonPhrase}: {preview}");
         }
 
-        using var doc = JsonDocument.Parse(responseJson);
+        // Some servers return NDJSON (multiple JSON lines) even with stream=false
+        // Take just the first valid JSON object
+        var jsonToParse = responseJson.Trim();
+        if (jsonToParse.Contains('\n'))
+        {
+            var lines = jsonToParse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // Find the line that contains "choices"
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("data: ")) trimmed = trimmed["data: ".Length..];
+                if (trimmed == "[DONE]") continue;
+                if (trimmed.StartsWith('{') && trimmed.Contains("choices"))
+                {
+                    jsonToParse = trimmed;
+                    break;
+                }
+            }
+        }
+
+        using var doc = JsonDocument.Parse(jsonToParse);
 
         return doc.RootElement
             .GetProperty("choices")[0]
