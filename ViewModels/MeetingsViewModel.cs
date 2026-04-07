@@ -202,9 +202,9 @@ public partial class MeetingsViewModel : ViewModelBase
         {
             Title = "New Meeting from Text",
             Width = 550,
-            Height = 480,
+            Height = 550,
             WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            CanResize = false,
+            CanResize = true,
             Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
         };
 
@@ -228,14 +228,16 @@ public partial class MeetingsViewModel : ViewModelBase
         }
         catch { }
 
-        var content = new Avalonia.Controls.StackPanel
+        var content = new Avalonia.Controls.DockPanel
         {
             Margin = new Avalonia.Thickness(24, 20),
-            Spacing = 14,
         };
 
-        // Title
-        content.Children.Add(new Avalonia.Controls.TextBlock
+        // Top fields
+        var topFields = new Avalonia.Controls.StackPanel { Spacing = 10 };
+        Avalonia.Controls.DockPanel.SetDock(topFields, Avalonia.Controls.Dock.Top);
+
+        topFields.Children.Add(new Avalonia.Controls.TextBlock
         {
             Text = "Title", FontSize = 12,
             Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
@@ -248,10 +250,9 @@ public partial class MeetingsViewModel : ViewModelBase
             CornerRadius = new Avalonia.CornerRadius(6),
             Padding = new Avalonia.Thickness(12, 8),
         };
-        content.Children.Add(titleBox);
+        topFields.Children.Add(titleBox);
 
-        // Language
-        content.Children.Add(new Avalonia.Controls.TextBlock
+        topFields.Children.Add(new Avalonia.Controls.TextBlock
         {
             Text = "Language", FontSize = 12,
             Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
@@ -267,20 +268,20 @@ public partial class MeetingsViewModel : ViewModelBase
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
             MinWidth = 100,
         };
-        content.Children.Add(langCombo);
+        topFields.Children.Add(langCombo);
+        content.Children.Add(topFields);
 
-        // Transcript
+        // Transcript textbox — fills remaining space
         var textBox = new Avalonia.Controls.TextBox
         {
             Watermark = "Paste or type the transcript here...",
             AcceptsReturn = true,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            MinHeight = 180,
-            MaxHeight = 250,
             Background = Avalonia.Media.Brush.Parse("#313244"),
             Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
             CornerRadius = new Avalonia.CornerRadius(6),
             Padding = new Avalonia.Thickness(12, 8),
+            Margin = new Avalonia.Thickness(0, 10, 0, 0),
         };
         // Import from file button
         var importBtn = new Avalonia.Controls.Button
@@ -317,7 +318,7 @@ public partial class MeetingsViewModel : ViewModelBase
             }
         };
 
-        var textRow = new Avalonia.Controls.DockPanel();
+        var textRow = new Avalonia.Controls.DockPanel { Margin = new Avalonia.Thickness(0, 10, 0, 0) };
         textRow.Children.Add(new Avalonia.Controls.TextBlock
         {
             Text = "Transcript", FontSize = 12,
@@ -326,11 +327,10 @@ public partial class MeetingsViewModel : ViewModelBase
         });
         Avalonia.Controls.DockPanel.SetDock(importBtn, Avalonia.Controls.Dock.Right);
         textRow.Children.Add(importBtn);
+        Avalonia.Controls.DockPanel.SetDock(textRow, Avalonia.Controls.Dock.Top);
         content.Children.Add(textRow);
 
-        content.Children.Add(textBox);
-
-        // Buttons
+        // Buttons docked to bottom
         var buttons = new Avalonia.Controls.StackPanel
         {
             Orientation = Avalonia.Layout.Orientation.Horizontal,
@@ -371,7 +371,12 @@ public partial class MeetingsViewModel : ViewModelBase
 
         buttons.Children.Add(cancelBtn);
         buttons.Children.Add(createBtn);
+        Avalonia.Controls.DockPanel.SetDock(buttons, Avalonia.Controls.Dock.Bottom);
         content.Children.Add(buttons);
+
+        // Textbox fills remaining space (added last in DockPanel)
+        content.Children.Add(textBox);
+
         dialog.Content = content;
 
         await dialog.ShowDialog(desktop.MainWindow);
