@@ -333,9 +333,28 @@ public partial class MeetingItemViewModel : ViewModelBase
     public DateTime StartedAt { get; }
     public string Duration { get; }
     public string AudioPath { get; }
-    public string Language { get; }
+
+    [ObservableProperty]
+    private string _language;
+
     public bool HasTranscript { get; }
     public bool HasSummary { get; }
+
+    /// <summary>Available languages for the dropdown, loaded from settings.</summary>
+    public ObservableCollection<string> AvailableLanguages { get; } = new(LoadLanguageCodes());
+
+    private static List<string> LoadLanguageCodes()
+    {
+        try
+        {
+            using var db = new AppDbContext();
+            var setting = db.AppSettings.FirstOrDefault(s => s.Key == "enabled_languages");
+            if (setting != null && !string.IsNullOrEmpty(setting.Value))
+                return setting.Value.Split(',').ToList();
+        }
+        catch { }
+        return ["en", "vi"];
+    }
 
     [ObservableProperty]
     private string _transcriptText = string.Empty;
@@ -381,6 +400,8 @@ public partial class MeetingItemViewModel : ViewModelBase
     [ObservableProperty]
     private double _playbackTotalSeconds;
 
+    private bool _langInitDone;
+
     public MeetingItemViewModel(Meeting meeting)
     {
         Id = meeting.Id;
@@ -388,7 +409,7 @@ public partial class MeetingItemViewModel : ViewModelBase
         Platform = meeting.Platform ?? "Other";
         StartedAt = meeting.StartedAt;
         AudioPath = meeting.AudioPath ?? string.Empty;
-        Language = meeting.Language;
+        _language = meeting.Language;
 
         if (meeting.DurationMs.HasValue)
         {
@@ -407,6 +428,33 @@ public partial class MeetingItemViewModel : ViewModelBase
             TranscriptText = meeting.Transcripts.First().FullText ?? string.Empty;
         if (HasSummary)
             SummaryText = meeting.Summaries.First().Content;
+
+        _langInitDone = true;
+    }
+
+    partial void OnLanguageChanged(string value)
+    {
+        if (!_langInitDone) return;
+        _ = SaveLanguageAsync(value);
+    }
+
+    private async Task SaveLanguageAsync(string language)
+    {
+        try
+        {
+            await using var db = new AppDbContext();
+            var meeting = await db.Meetings.FindAsync(Id);
+            if (meeting != null)
+            {
+                meeting.Language = language;
+                await db.SaveChangesAsync();
+                StatusMessage = $"Language changed to {language}";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to save language: {ex.Message}";
+        }
     }
 
     private static Avalonia.Input.Platform.IClipboard? GetClipboard()

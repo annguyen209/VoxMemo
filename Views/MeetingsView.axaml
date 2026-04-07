@@ -123,12 +123,19 @@
                             <StackPanel Spacing="4">
                                 <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold"
                                            Foreground="#cdd6f4" TextTrimming="CharacterEllipsis"/>
-                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                    <TextBlock Text="{Binding Platform}" FontSize="12" Foreground="#bac2de"/>
-                                    <TextBlock Text="{Binding Duration}" FontSize="12" Foreground="#bac2de"/>
-                                    <TextBlock Text="{Binding Language}" FontSize="12" Foreground="#bac2de"/>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock Text="{Binding Platform}" FontSize="12" Foreground="#bac2de"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Duration}" FontSize="12" Foreground="#bac2de"
+                                               VerticalAlignment="Center"/>
+                                    <ComboBox ItemsSource="{Binding AvailableLanguages}"
+                                              SelectedItem="{Binding Language}"
+                                              Background="#313244" Foreground="#cdd6f4"
+                                              CornerRadius="4" Padding="6,2" FontSize="11"
+                                              MinWidth="60" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding StartedAt, StringFormat='{}{0:MMM dd, yyyy HH:mm}'}"
-                                               FontSize="12" Foreground="#bac2de"/>
+                                               FontSize="12" Foreground="#bac2de"
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
                         </DockPanel>
