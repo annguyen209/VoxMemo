@@ -333,7 +333,9 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 Log.Error(ex, "Job failed for {MeetingId} action={Action}", meetingId, action);
-                ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} failed");
+                // Friendly error for common cases
+                var errorMsg = ex.Message.Length > 150 ? ex.Message[..150] + "..." : ex.Message;
+                ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} failed: {errorMsg}");
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     job.IsActive = false;
@@ -342,7 +344,11 @@ public partial class MainWindowViewModel : ViewModelBase
                     job.Step = ex.Message;
                     job.MarkFinished();
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = false;
+                    if (vm != null)
+                    {
+                        vm.IsBusy = false;
+                        vm.StatusMessage = $"Error: {errorMsg}";
+                    }
                 });
                 SetStatus("", false);
             }
