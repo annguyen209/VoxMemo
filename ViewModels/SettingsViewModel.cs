@@ -50,6 +50,27 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private AiModel? _selectedAiModel;
 
+    partial void OnSelectedAiModelChanged(AiModel? value)
+    {
+        if (value != null && !_isLoading)
+        {
+            _ = SaveSettingDirectAsync("ai_model", value.Id);
+        }
+    }
+
+    private static async Task SaveSettingDirectAsync(string key, string value)
+    {
+        try
+        {
+            await using var db = new Services.Database.AppDbContext();
+            var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting != null) setting.Value = value;
+            else db.AppSettings.Add(new Models.AppSettings { Key = key, Value = value });
+            await db.SaveChangesAsync();
+        }
+        catch { }
+    }
+
     // Transcription Settings
     [ObservableProperty]
     private string _selectedWhisperModel = "base";
@@ -341,8 +362,18 @@ public partial class SettingsViewModel : ViewModelBase
             var models = await provider.GetAvailableModelsAsync();
             AvailableAiModels = new ObservableCollection<AiModel>(models);
 
-            if (models.Count > 0)
-                SelectedAiModel = models[0];
+            // Restore saved model selection, or default to first
+            string? savedModelId = null;
+            try
+            {
+                await using var db = new Services.Database.AppDbContext();
+                var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "ai_model");
+                savedModelId = setting?.Value;
+            }
+            catch { }
+
+            var saved = models.FirstOrDefault(m => m.Id == savedModelId);
+            SelectedAiModel = saved ?? (models.Count > 0 ? models[0] : null);
 
             StatusMessage = $"Found {models.Count} models for {SelectedAiProvider}";
         }

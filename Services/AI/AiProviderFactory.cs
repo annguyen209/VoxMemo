@@ -38,14 +38,36 @@ public static class AiProviderFactory
             _ => new OllamaProvider(ollamaUrl, timeout)
         };
 
+        // Read user's selected model, fall back to first available
         string? modelId = null;
         try
         {
-            var models = await provider.GetAvailableModelsAsync();
-            if (models.Count > 0)
-                modelId = models[0].Id;
+            await using var db2 = new AppDbContext();
+            modelId = (await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "ai_model"))?.Value;
         }
         catch { }
+
+        // Verify the saved model still exists, otherwise pick first
+        if (!string.IsNullOrEmpty(modelId))
+        {
+            try
+            {
+                var models = await provider.GetAvailableModelsAsync();
+                if (!models.Exists(m => m.Id == modelId))
+                    modelId = models.Count > 0 ? models[0].Id : null;
+            }
+            catch { }
+        }
+        else
+        {
+            try
+            {
+                var models = await provider.GetAvailableModelsAsync();
+                if (models.Count > 0)
+                    modelId = models[0].Id;
+            }
+            catch { }
+        }
 
         return (provider, modelId);
     }
