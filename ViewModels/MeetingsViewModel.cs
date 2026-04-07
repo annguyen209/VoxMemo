@@ -565,6 +565,7 @@ public partial class MeetingItemViewModel : ViewModelBase
     [ObservableProperty]
     private string _language;
 
+    public bool HasAudio => !string.IsNullOrEmpty(AudioPath);
     public bool HasTranscript { get; }
     public bool HasSummary { get; }
 
@@ -987,7 +988,11 @@ public partial class MeetingItemViewModel : ViewModelBase
     [RelayCommand]
     private void Transcribe()
     {
-        if (string.IsNullOrEmpty(AudioPath)) return;
+        if (string.IsNullOrEmpty(AudioPath))
+        {
+            StatusMessage = "No audio file — this meeting was imported from text.";
+            return;
+        }
         StatusMessage = "Queued for transcription...";
         JobRequested?.Invoke(this, (Id, "transcribe"));
     }
@@ -1007,7 +1012,8 @@ public partial class MeetingItemViewModel : ViewModelBase
     [RelayCommand]
     private async Task ProcessAllAsync()
     {
-        if (string.IsNullOrEmpty(AudioPath)) return;
+        // Need either audio (for transcription) or existing transcript (for speaker ID / summary)
+        if (string.IsNullOrEmpty(AudioPath) && string.IsNullOrEmpty(TranscriptText)) return;
 
         // Check "don't ask again" setting
         bool skipDialog = false;

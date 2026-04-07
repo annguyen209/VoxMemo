@@ -136,7 +136,9 @@ public partial class MainWindowViewModel : ViewModelBase
             if (action.StartsWith("pipeline:"))
             {
                 var steps = action["pipeline:".Length..];
-                if (steps.Contains('t'))
+                var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
+                // Only enqueue transcribe if there's audio to transcribe
+                if (steps.Contains('t') && hasAudio)
                     EnqueueManualJob(meetingId, title, "transcribe");
                 if (steps.Contains('s'))
                     EnqueueManualJob(meetingId, title, "identify_speakers");

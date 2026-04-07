@@ -163,8 +163,16 @@
                     <ScrollViewer>
                         <StackPanel Margin="24,12,24,24" Spacing="16">
 
+                            <!-- No Audio notice -->
+                            <Border Background="#1e1e2e" CornerRadius="10" Padding="16,12"
+                                    IsVisible="{Binding !HasAudio}">
+                                <TextBlock Text="No audio file — this meeting was imported from text."
+                                           FontSize="12" Foreground="#7f849c"/>
+                            </Border>
+
                             <!-- Audio Player -->
-                            <Border Background="#1e1e2e" CornerRadius="10" Padding="16,12">
+                            <Border Background="#1e1e2e" CornerRadius="10" Padding="16,12"
+                                    IsVisible="{Binding HasAudio}">
                                 <StackPanel Spacing="12">
                                     <DockPanel>
                                         <TextBlock Text="Audio Player" FontSize="13" FontWeight="SemiBold"
