@@ -76,9 +76,14 @@ public class AnthropicProvider : IAiProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _http.PostAsync($"{_baseUrl}/v1/messages", content, ct);
-        response.EnsureSuccessStatusCode();
-
         var responseJson = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            throw new HttpRequestException($"Anthropic returned {(int)response.StatusCode}: {preview}");
+        }
+
         using var doc = JsonDocument.Parse(responseJson);
 
         return doc.RootElement

@@ -78,9 +78,14 @@ public class OpenAiProvider : IAiProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _http.PostAsync($"{_baseUrl}/chat/completions", content, ct);
-        response.EnsureSuccessStatusCode();
-
         var responseJson = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            throw new HttpRequestException($"API returned {(int)response.StatusCode} {response.ReasonPhrase}: {preview}");
+        }
+
         using var doc = JsonDocument.Parse(responseJson);
 
         return doc.RootElement

@@ -78,9 +78,14 @@ public class OllamaProvider : IAiProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _http.PostAsync($"{_baseUrl}/api/chat", content, ct);
-        response.EnsureSuccessStatusCode();
-
         var responseJson = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            throw new HttpRequestException($"Ollama returned {(int)response.StatusCode}: {preview}");
+        }
+
         using var doc = JsonDocument.Parse(responseJson);
 
         var result = doc.RootElement
