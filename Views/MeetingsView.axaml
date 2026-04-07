@@ -28,12 +28,20 @@
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="16,8,16,16">
-                    <Button Content="+ New Meeting"
-                            Command="{Binding CreateMeetingCommand}"
-                            HorizontalAlignment="Stretch"
-                            Padding="12,8"
-                            Background="#cba6f7" Foreground="#1e1e2e"
-                            CornerRadius="8" FontWeight="SemiBold"/>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Grid.Column="0" Content="+ From Audio"
+                                Command="{Binding CreateMeetingCommand}"
+                                HorizontalAlignment="Stretch"
+                                Padding="12,8"
+                                Background="#cba6f7" Foreground="#1e1e2e"
+                                CornerRadius="8" FontWeight="SemiBold"/>
+                        <Button Grid.Column="2" Content="+ From Text"
+                                Command="{Binding CreateFromTextCommand}"
+                                HorizontalAlignment="Stretch"
+                                Padding="12,8"
+                                Background="#89b4fa" Foreground="#1e1e2e"
+                                CornerRadius="8" FontWeight="SemiBold"/>
+                    </Grid>
                     <Button Content="Refresh"
                             Command="{Binding LoadMeetingsCommand}"
                             HorizontalAlignment="Stretch"

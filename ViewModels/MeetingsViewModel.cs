@@ -185,6 +185,188 @@ public partial class MeetingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task CreateFromTextAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime
+            is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow == null)
+            return;
+
+        // Show dialog with title + text area
+        var confirmed = false;
+        string title = "";
+        string transcript = "";
+        string language = "en";
+
+        var dialog = new Avalonia.Controls.Window
+        {
+            Title = "New Meeting from Text",
+            Width = 550,
+            Height = 480,
+            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
+        };
+
+        // Read default language
+        try
+        {
+            await using var db2 = new AppDbContext();
+            var langSetting = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "default_language");
+            if (langSetting != null) language = langSetting.Value;
+        }
+        catch { }
+
+        // Load enabled languages
+        List<string> languages = ["en", "vi"];
+        try
+        {
+            await using var db3 = new AppDbContext();
+            var langListSetting = await db3.AppSettings.FirstOrDefaultAsync(s => s.Key == "enabled_languages");
+            if (langListSetting != null && !string.IsNullOrEmpty(langListSetting.Value))
+                languages = langListSetting.Value.Split(',').ToList();
+        }
+        catch { }
+
+        var content = new Avalonia.Controls.StackPanel
+        {
+            Margin = new Avalonia.Thickness(24, 20),
+            Spacing = 14,
+        };
+
+        // Title
+        content.Children.Add(new Avalonia.Controls.TextBlock
+        {
+            Text = "Title", FontSize = 12,
+            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+        });
+        var titleBox = new Avalonia.Controls.TextBox
+        {
+            Watermark = "Meeting title...",
+            Background = Avalonia.Media.Brush.Parse("#313244"),
+            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
+            CornerRadius = new Avalonia.CornerRadius(6),
+            Padding = new Avalonia.Thickness(12, 8),
+        };
+        content.Children.Add(titleBox);
+
+        // Language
+        content.Children.Add(new Avalonia.Controls.TextBlock
+        {
+            Text = "Language", FontSize = 12,
+            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+        });
+        var langCombo = new Avalonia.Controls.ComboBox
+        {
+            ItemsSource = languages,
+            SelectedItem = language,
+            Background = Avalonia.Media.Brush.Parse("#313244"),
+            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
+            CornerRadius = new Avalonia.CornerRadius(6),
+            Padding = new Avalonia.Thickness(10, 6),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+            MinWidth = 100,
+        };
+        content.Children.Add(langCombo);
+
+        // Transcript
+        content.Children.Add(new Avalonia.Controls.TextBlock
+        {
+            Text = "Transcript", FontSize = 12,
+            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+        });
+        var textBox = new Avalonia.Controls.TextBox
+        {
+            Watermark = "Paste or type the transcript here...",
+            AcceptsReturn = true,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            MinHeight = 180,
+            MaxHeight = 250,
+            Background = Avalonia.Media.Brush.Parse("#313244"),
+            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
+            CornerRadius = new Avalonia.CornerRadius(6),
+            Padding = new Avalonia.Thickness(12, 8),
+        };
+        content.Children.Add(textBox);
+
+        // Buttons
+        var buttons = new Avalonia.Controls.StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 10,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Margin = new Avalonia.Thickness(0, 4, 0, 0),
+        };
+
+        var cancelBtn = new Avalonia.Controls.Button
+        {
+            Content = "Cancel",
+            Background = Avalonia.Media.Brush.Parse("#313244"),
+            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
+            Padding = new Avalonia.Thickness(24, 10),
+            CornerRadius = new Avalonia.CornerRadius(8),
+            FontSize = 13,
+        };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        var createBtn = new Avalonia.Controls.Button
+        {
+            Content = "Create Meeting",
+            Background = Avalonia.Media.Brush.Parse("#89b4fa"),
+            Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
+            Padding = new Avalonia.Thickness(24, 10),
+            CornerRadius = new Avalonia.CornerRadius(8),
+            FontSize = 13,
+            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+        };
+        createBtn.Click += (_, _) =>
+        {
+            title = titleBox.Text ?? "";
+            transcript = textBox.Text ?? "";
+            language = langCombo.SelectedItem?.ToString() ?? "en";
+            confirmed = true;
+            dialog.Close();
+        };
+
+        buttons.Children.Add(cancelBtn);
+        buttons.Children.Add(createBtn);
+        content.Children.Add(buttons);
+        dialog.Content = content;
+
+        await dialog.ShowDialog(desktop.MainWindow);
+        if (!confirmed || string.IsNullOrWhiteSpace(transcript)) return;
+
+        if (string.IsNullOrWhiteSpace(title))
+            title = $"Text Import {DateTime.Now:MMM dd, yyyy HH:mm}";
+
+        // Save meeting + transcript to DB
+        var meeting = new Meeting
+        {
+            Title = title,
+            Platform = "Text Import",
+            StartedAt = DateTime.UtcNow,
+            EndedAt = DateTime.UtcNow,
+            Language = language,
+        };
+
+        await using var dbSave = new AppDbContext();
+        dbSave.Meetings.Add(meeting);
+
+        dbSave.Transcripts.Add(new Transcript
+        {
+            MeetingId = meeting.Id,
+            Engine = "manual",
+            Language = language,
+            FullText = transcript,
+        });
+
+        await dbSave.SaveChangesAsync();
+
+        await LoadMeetingsAsync();
+        SelectedMeeting = Meetings.FirstOrDefault(m => m.Id == meeting.Id);
+    }
+
+    [RelayCommand]
     private async Task CreateMeetingAsync()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime
