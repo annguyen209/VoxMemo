@@ -11,21 +11,23 @@ public class WindowsNotificationService : INotificationService
     {
         try
         {
-            // Sanitize for XML
-            var safeTitle = System.Security.SecurityElement.Escape(title);
-            var safeMsg = System.Security.SecurityElement.Escape(message);
+            // Escape single quotes for PowerShell strings
+            var safeTitle = title.Replace("'", "''");
+            var safeMsg = message.Replace("'", "''");
 
-            // Write a temp PS1 script to avoid quote escaping hell
-            var scriptPath = Path.Combine(Path.GetTempPath(), "voxmemo_toast.ps1");
+            // Use System.Windows.Forms.NotifyIcon balloon — works reliably without UWP/AUMID registration
             var script = $@"
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
-$xml = '<toast><visual><binding template=""ToastGeneric""><text>{safeTitle}</text><text>{safeMsg}</text></binding></visual></toast>'
-$doc = New-Object Windows.Data.Xml.Dom.XmlDocument
-$doc.LoadXml($xml)
-$toast = [Windows.UI.Notifications.ToastNotification]::new($doc)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('VoxMemo').Show($toast)
+Add-Type -AssemblyName System.Windows.Forms
+$balloon = New-Object System.Windows.Forms.NotifyIcon
+$balloon.Icon = [System.Drawing.SystemIcons]::Information
+$balloon.BalloonTipTitle = '{safeTitle}'
+$balloon.BalloonTipText = '{safeMsg}'
+$balloon.Visible = $true
+$balloon.ShowBalloonTip(5000)
+Start-Sleep -Seconds 6
+$balloon.Dispose()
 ";
+            var scriptPath = Path.Combine(Path.GetTempPath(), "voxmemo_toast.ps1");
             File.WriteAllText(scriptPath, script);
 
             Process.Start(new ProcessStartInfo
