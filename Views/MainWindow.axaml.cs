@@ -13,17 +13,9 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm && vm.Recording.IsRecording)
-        {
-            // Minimize to system tray while recording
-            e.Cancel = true;
-            Hide();
-        }
-        else
-        {
-            // If not recording, hide to tray (user can exit from tray menu)
-            e.Cancel = true;
-            Hide();
-        }
+        e.Cancel = true;
+        Hide();
+
+        MainWindowViewModel.ShowTrayNotification("VoxMemo", "VoxMemo is still running in the system tray.");
     }
 }
