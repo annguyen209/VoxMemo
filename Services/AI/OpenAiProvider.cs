@@ -23,7 +23,7 @@ public class OpenAiProvider : IAiProvider
     {
         _apiKey = apiKey;
         _baseUrl = baseUrl.TrimEnd('/');
-        _http = new HttpClient();
+        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         if (!string.IsNullOrEmpty(apiKey))
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }

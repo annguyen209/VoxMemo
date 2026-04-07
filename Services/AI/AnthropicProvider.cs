@@ -20,7 +20,7 @@ public class AnthropicProvider : IAiProvider
     public AnthropicProvider(string apiKey, string baseUrl = "https://api.anthropic.com")
     {
         _baseUrl = baseUrl;
-        _http = new HttpClient();
+        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         _http.DefaultRequestHeaders.Add("x-api-key", apiKey);
         _http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
     }
