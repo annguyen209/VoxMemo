@@ -1,0 +1,187 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Serilog;
+using VoxMemo.Services.Audio;
+
+namespace VoxMemo.Services.Platform.MacOS;
+
+/// <summary>
+/// macOS audio recorder using ffmpeg with avfoundation.
+/// System audio loopback requires a virtual audio device (BlackHole, Soundflower).
+/// </summary>
+public class MacAudioRecorderService : IAudioRecorder, IDisposable
+{
+    private Process? _recordProcess;
+    private readonly Stopwatch _stopwatch = new();
+    private bool _isPaused;
+
+    public event EventHandler<float>? AudioLevelChanged;
+    public event EventHandler<string>? RecordingError;
+
+    public bool IsRecording => _recordProcess != null && !_recordProcess.HasExited;
+    public bool IsPaused => _isPaused;
+    public TimeSpan Elapsed => _stopwatch.Elapsed;
+    public string? LastSnapshotError => "Live captions not yet supported on macOS";
+
+    public List<AudioDevice> GetInputDevices()
+    {
+        try
+        {
+            var output = RunCommand("ffmpeg", "-f avfoundation -list_devices true -i \"\" 2>&1");
+            return ParseAvfoundationDevices(output, "audio");
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    public List<AudioDevice> GetLoopbackDevices()
+    {
+        // macOS loopback requires virtual audio device (BlackHole, Soundflower)
+        // These appear as regular audio inputs in avfoundation
+        var devices = GetInputDevices();
+        return devices.Where(d =>
+            d.Name.Contains("BlackHole", StringComparison.OrdinalIgnoreCase) ||
+            d.Name.Contains("Soundflower", StringComparison.OrdinalIgnoreCase) ||
+            d.Name.Contains("Loopback", StringComparison.OrdinalIgnoreCase))
+            .Select(d => new AudioDevice(d.Id, $"[Loopback] {d.Name}", true))
+            .ToList();
+    }
+
+    public Task StartRecordingAsync(string outputPath, AudioSourceType sourceType, string? deviceId = null)
+    {
+        try
+        {
+            var input = deviceId ?? "default";
+            // ffmpeg -f avfoundation -i ":deviceId" -ar 16000 -ac 1 output.wav
+            var args = $"-f avfoundation -i \":{input}\" -ar 16000 -ac 1 -y \"{outputPath}\"";
+
+            _recordProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                }
+            };
+
+            _recordProcess.Start();
+            _stopwatch.Restart();
+            _isPaused = false;
+
+            Log.Information("macOS recording started: device={Device} output={Path}", deviceId, outputPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to start macOS recording");
+            RecordingError?.Invoke(this, ex.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopRecordingAsync()
+    {
+        _stopwatch.Stop();
+
+        if (_recordProcess != null && !_recordProcess.HasExited)
+        {
+            try
+            {
+                // Send 'q' to ffmpeg stdin for graceful stop
+                _recordProcess.Kill(true);
+                _recordProcess.WaitForExit(3000);
+            }
+            catch { }
+        }
+
+        _recordProcess?.Dispose();
+        _recordProcess = null;
+        _isPaused = false;
+
+        return Task.CompletedTask;
+    }
+
+    public void PauseRecording()
+    {
+        if (_recordProcess != null && !_recordProcess.HasExited)
+        {
+            try { RunCommand("kill", $"-STOP {_recordProcess.Id}"); } catch { }
+            _isPaused = true;
+            _stopwatch.Stop();
+        }
+    }
+
+    public void ResumeRecording()
+    {
+        if (_recordProcess != null && !_recordProcess.HasExited)
+        {
+            try { RunCommand("kill", $"-CONT {_recordProcess.Id}"); } catch { }
+            _isPaused = false;
+            _stopwatch.Start();
+        }
+    }
+
+    public string? CreateSnapshotForTranscription(string tempDir) => null;
+
+    private static List<AudioDevice> ParseAvfoundationDevices(string output, string type)
+    {
+        var devices = new List<AudioDevice>();
+        var inSection = false;
+
+        foreach (var line in output.Split('\n'))
+        {
+            if (line.Contains($"AVFoundation {type} devices:", StringComparison.OrdinalIgnoreCase))
+            { inSection = true; continue; }
+            if (line.Contains("AVFoundation", StringComparison.OrdinalIgnoreCase) && inSection)
+                break;
+
+            if (inSection && line.Contains(']'))
+            {
+                var bracketEnd = line.IndexOf(']');
+                var bracketStart = line.LastIndexOf('[', bracketEnd);
+                if (bracketStart >= 0)
+                {
+                    var id = line[(bracketStart + 1)..bracketEnd].Trim();
+                    var name = line[(bracketEnd + 1)..].Trim();
+                    devices.Add(new AudioDevice(id, name, false));
+                }
+            }
+        }
+
+        return devices;
+    }
+
+    private static string RunCommand(string fileName, string arguments)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+
+        using var proc = Process.Start(psi);
+        if (proc == null) return string.Empty;
+        var output = proc.StandardOutput.ReadToEnd() + proc.StandardError.ReadToEnd();
+        proc.WaitForExit(5000);
+        return output;
+    }
+
+    public void Dispose()
+    {
+        StopRecordingAsync().Wait();
+        GC.SuppressFinalize(this);
+    }
+}

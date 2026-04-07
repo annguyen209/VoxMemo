@@ -20,6 +20,10 @@ public static class PlatformServices
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return new Windows.WindowsAudioPlaybackService();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return new MacOS.MacAudioPlaybackService();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return new Linux.LinuxAudioPlaybackService();
         return new Stub.StubAudioPlaybackService();
     }
 
@@ -32,6 +36,22 @@ public static class PlatformServices
             Notifications = new Windows.WindowsNotificationService();
             GlobalHotkey = new Windows.WindowsGlobalHotkeyService();
             Startup = new Windows.WindowsStartupService();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            AudioRecorder = new Linux.LinuxAudioRecorderService();
+            AudioConverter = new Linux.LinuxAudioConverter();
+            Notifications = new Linux.LinuxNotificationService();
+            GlobalHotkey = new Stub.StubGlobalHotkeyService(); // no cross-desktop hotkey API
+            Startup = new Linux.LinuxStartupService();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            AudioRecorder = new MacOS.MacAudioRecorderService();
+            AudioConverter = new MacOS.MacAudioConverter();
+            Notifications = new MacOS.MacNotificationService();
+            GlobalHotkey = new Stub.StubGlobalHotkeyService(); // requires Carbon/AppKit
+            Startup = new MacOS.MacStartupService();
         }
         else
         {
