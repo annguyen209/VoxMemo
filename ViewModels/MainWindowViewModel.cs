@@ -137,10 +137,14 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var steps = action["pipeline:".Length..];
                 var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
-                // Only enqueue transcribe if there's audio to transcribe
-                if (steps.Contains('t') && hasAudio)
+                var hasTranscript = !string.IsNullOrEmpty(meetingVm?.TranscriptText);
+                var hasSpeakers = hasTranscript && HasSpeakerLabels(meetingVm!.TranscriptText);
+
+                // Skip transcribe if no audio or already transcribed
+                if (steps.Contains('t') && hasAudio && !hasTranscript)
                     EnqueueManualJob(meetingId, title, "transcribe");
-                if (steps.Contains('s'))
+                // Skip identify speakers if already done
+                if (steps.Contains('s') && !hasSpeakers)
                     EnqueueManualJob(meetingId, title, "identify_speakers");
                 if (steps.Contains('m'))
                     EnqueueManualJob(meetingId, title, "summarize");
@@ -606,6 +610,27 @@ public partial class MainWindowViewModel : ViewModelBase
             job.Status = status;
             job.Step = step;
         });
+    }
+
+    /// <summary>Detects if transcript already has speaker labels (e.g. "Speaker A:", "John:", "Manager:").</summary>
+    private static bool HasSpeakerLabels(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        int labelCount = 0;
+        foreach (var line in lines)
+        {
+            var colonIdx = line.IndexOf(':');
+            // Pattern: short label (1-30 chars) followed by colon, then text
+            if (colonIdx > 0 && colonIdx <= 30 && colonIdx < line.Length - 1)
+            {
+                var label = line[..colonIdx].Trim();
+                // Label should be words only (no timestamps, no URLs)
+                if (!string.IsNullOrEmpty(label) && !label.Contains("//") && !label.Contains('.'))
+                    labelCount++;
+            }
+            if (labelCount >= 3) return true; // 3+ labeled lines = speakers identified
+        }
+        return false;
     }
 
     [RelayCommand]
