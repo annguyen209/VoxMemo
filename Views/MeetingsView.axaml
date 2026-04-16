@@ -254,7 +254,14 @@
                                     <DockPanel Margin="0,12">
                                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
                                                     HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
+                                            <Button Command="{Binding ToggleOriginalTranscriptCommand}"
+                                                    IsVisible="{Binding HasOriginalTranscript}"
+                                                    Background="#45475a" Foreground="#cdd6f4"
+                                                    CornerRadius="6" Padding="12,5" FontSize="12">
+                                                <TextBlock Text="{Binding TranscriptViewLabel}"/>
+                                            </Button>
                                             <Button Command="{Binding SaveTranscriptCommand}"
+                                                    IsVisible="{Binding !ShowOriginalTranscript}"
                                                     Background="#cba6f7" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="12,5" FontSize="12"
                                                     FontWeight="SemiBold">
@@ -266,12 +273,22 @@
                                                 <TextBlock Text="Copy"/>
                                             </Button>
                                             <Button Command="{Binding ExportTranscriptCommand}"
+                                                    IsVisible="{Binding !ShowOriginalTranscript}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Export"/>
                                             </Button>
                                         </StackPanel>
+                                        <TextBox Text="{Binding OriginalTranscriptText}"
+                                                 IsVisible="{Binding ShowOriginalTranscript}"
+                                                 IsReadOnly="True"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 Background="#1e1e2e" Foreground="#a6adc8"
+                                                 CornerRadius="8" Padding="16"
+                                                 MinHeight="250"/>
                                         <TextBox Text="{Binding TranscriptText}"
+                                                 IsVisible="{Binding !ShowOriginalTranscript}"
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
                                                  Background="#1e1e2e" Foreground="#cdd6f4"

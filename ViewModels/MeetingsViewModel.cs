@@ -589,6 +589,26 @@ public partial class MeetingItemViewModel : ViewModelBase
     private string _transcriptText = string.Empty;
 
     [ObservableProperty]
+    private string _originalTranscriptText = string.Empty;
+
+    [ObservableProperty]
+    private bool _showOriginalTranscript;
+
+    public bool HasOriginalTranscript => !string.IsNullOrEmpty(OriginalTranscriptText);
+    public string TranscriptViewLabel => ShowOriginalTranscript ? "Show Identified" : "Show Original";
+
+    partial void OnOriginalTranscriptTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasOriginalTranscript));
+        OnPropertyChanged(nameof(TranscriptViewLabel));
+    }
+
+    partial void OnShowOriginalTranscriptChanged(bool value) => OnPropertyChanged(nameof(TranscriptViewLabel));
+
+    [RelayCommand]
+    private void ToggleOriginalTranscript() => ShowOriginalTranscript = !ShowOriginalTranscript;
+
+    [ObservableProperty]
     private string _summaryText = string.Empty;
 
     [ObservableProperty]
@@ -654,7 +674,11 @@ public partial class MeetingItemViewModel : ViewModelBase
         HasSummary = meeting.Summaries.Count > 0;
 
         if (HasTranscript)
-            TranscriptText = meeting.Transcripts.First().FullText ?? string.Empty;
+        {
+            var t = meeting.Transcripts.OrderByDescending(t => t.CreatedAt).First();
+            TranscriptText = t.FullText ?? string.Empty;
+            OriginalTranscriptText = t.OriginalFullText ?? string.Empty;
+        }
         if (HasSummary)
             SummaryText = meeting.Summaries.First().Content;
 
@@ -739,11 +763,12 @@ public partial class MeetingItemViewModel : ViewModelBase
     [RelayCommand]
     private async Task CopyTranscriptAsync()
     {
-        if (string.IsNullOrEmpty(TranscriptText)) return;
+        var text = ShowOriginalTranscript ? OriginalTranscriptText : TranscriptText;
+        if (string.IsNullOrEmpty(text)) return;
         var clipboard = GetClipboard();
         if (clipboard != null)
         {
-            await clipboard.SetTextAsync(TranscriptText);
+            await clipboard.SetTextAsync(text);
             StatusMessage = "Transcript copied to clipboard";
         }
     }

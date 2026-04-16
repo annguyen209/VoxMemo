@@ -77,30 +77,67 @@ public class LinuxAudioRecorderService : IAudioRecorder, IDisposable
     {
         try
         {
-            // Use parecord (PulseAudio) to record as WAV
-            var args = $"--format=s16le --rate=16000 --channels=1 --file-format=wav";
-            if (!string.IsNullOrEmpty(deviceId))
-                args += $" --device={deviceId}";
-            args += $" {outputPath}";
-
-            _recordProcess = new Process
+            if (sourceType == AudioSourceType.Both)
             {
-                StartInfo = new ProcessStartInfo
+                // Mix mic + system audio loopback using ffmpeg amix
+                var micSource = deviceId ?? "default";
+                var monitorSource = GetDefaultMonitorSource();
+
+                string args;
+                if (!string.IsNullOrEmpty(monitorSource))
                 {
-                    FileName = "parecord",
-                    Arguments = args,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
+                    // Two inputs: mic + loopback monitor, mixed together
+                    args = $"-f pulse -i {micSource} -f pulse -i {monitorSource} " +
+                           $"-filter_complex amix=inputs=2:duration=longest:dropout_transition=0 " +
+                           $"-ar 16000 -ac 1 -sample_fmt s16 -y \"{outputPath}\"";
+                    Log.Information("Linux Both-mode: mic={Mic} monitor={Monitor} output={Path}", micSource, monitorSource, outputPath);
                 }
-            };
+                else
+                {
+                    // No monitor found, fall back to mic only
+                    args = $"-f pulse -i {micSource} -ar 16000 -ac 1 -sample_fmt s16 -y \"{outputPath}\"";
+                    Log.Warning("No PulseAudio monitor found, recording mic only");
+                }
+
+                _recordProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffmpeg",
+                        Arguments = args,
+                        UseShellExecute = false,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true,
+                    }
+                };
+            }
+            else
+            {
+                // Use parecord (PulseAudio) to record as WAV
+                var args = $"--format=s16le --rate=16000 --channels=1 --file-format=wav";
+                if (!string.IsNullOrEmpty(deviceId))
+                    args += $" --device={deviceId}";
+                args += $" \"{outputPath}\"";
+
+                _recordProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "parecord",
+                        Arguments = args,
+                        UseShellExecute = false,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true,
+                    }
+                };
+            }
 
             _recordProcess.Start();
             _stopwatch.Restart();
             _isPaused = false;
             _currentOutputPath = outputPath;
 
-            Log.Information("Linux recording started: device={Device} output={Path}", deviceId, outputPath);
+            Log.Information("Linux recording started: source={Source} device={Device} output={Path}", sourceType, deviceId, outputPath);
         }
         catch (Exception ex)
         {
@@ -109,6 +146,20 @@ public class LinuxAudioRecorderService : IAudioRecorder, IDisposable
         }
 
         return Task.CompletedTask;
+    }
+
+    private static string? GetDefaultMonitorSource()
+    {
+        try
+        {
+            var output = RunCommand("pactl", "list short sources");
+            var monitorLine = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault(l => l.Contains(".monitor", StringComparison.OrdinalIgnoreCase));
+            if (monitorLine == null) return null;
+            var parts = monitorLine.Split('\t');
+            return parts.Length > 1 ? parts[1] : null;
+        }
+        catch { return null; }
     }
 
     public Task StopRecordingAsync()

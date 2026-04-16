@@ -30,6 +30,18 @@ public partial class App : Application
         await using (var db = new AppDbContext())
         {
             await db.Database.EnsureCreatedAsync();
+            try
+            {
+                var dbPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "VoxMemo", "voxmemo.db");
+                await using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
+                await conn.OpenAsync();
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ALTER TABLE Transcripts ADD COLUMN OriginalFullText TEXT";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch { }
         }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

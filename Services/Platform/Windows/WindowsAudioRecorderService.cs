@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using Serilog;
 
 using VoxMemo.Services.Audio;
@@ -14,21 +15,34 @@ namespace VoxMemo.Services.Platform.Windows;
 
 public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
 {
+    // Single-source mode
     private WasapiCapture? _capture;
     private WaveFileWriter? _writer;
     private WaveFormat? _captureFormat;
+
+    // Both-mode (mic + system audio)
+    private bool _isMixMode;
+    private WasapiCapture? _micCapture;
+    private WasapiLoopbackCapture? _sysCapture;
+    private WaveFileWriter? _micWriter;
+    private WaveFileWriter? _sysWriter;
+    private string? _mixFinalPath;
+    private string? _micTempPath;
+    private string? _sysTempPath;
+
     private readonly Stopwatch _stopwatch = new();
     private bool _isPaused;
 
-    // Buffer recent audio for live caption snapshots
+    // Buffer recent audio for live caption snapshots (from primary/sys capture)
     private readonly object _bufferLock = new();
     private readonly List<byte> _recentBuffer = [];
+    private WaveFormat? _bufferFormat;
     private const int MaxBufferSeconds = 10;
 
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
 
-    public bool IsRecording => _capture != null && _stopwatch.IsRunning;
+    public bool IsRecording => (_capture != null || _sysCapture != null) && _stopwatch.IsRunning;
     public bool IsPaused => _isPaused;
     public TimeSpan Elapsed => _stopwatch.Elapsed;
 
@@ -62,37 +76,80 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
         {
             var enumerator = new MMDeviceEnumerator();
 
-            if (sourceType == AudioSourceType.SystemAudio)
+            if (sourceType == AudioSourceType.Both)
             {
-                MMDevice device = deviceId != null
+                _isMixMode = true;
+                _mixFinalPath = outputPath;
+
+                var tempDir = Path.GetDirectoryName(outputPath) ?? Path.GetTempPath();
+                var stamp = Guid.NewGuid().ToString("N")[..8];
+                _micTempPath = Path.Combine(tempDir, $"vox_mic_{stamp}.wav");
+                _sysTempPath = Path.Combine(tempDir, $"vox_sys_{stamp}.wav");
+
+                // Mic capture
+                MMDevice micDevice = deviceId != null
                     ? enumerator.GetDevice(deviceId)
-                    : enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                _capture = new WasapiLoopbackCapture(device);
+                    : enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                _micCapture = new WasapiCapture(micDevice);
+                _micWriter = new WaveFileWriter(_micTempPath, _micCapture.WaveFormat);
+
+                // System audio capture (default render device loopback)
+                MMDevice sysDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                _sysCapture = new WasapiLoopbackCapture(sysDevice);
+                var sysFormat = _sysCapture.WaveFormat;
+                _sysWriter = new WaveFileWriter(_sysTempPath, sysFormat);
+
+                _bufferFormat = sysFormat;
+                lock (_bufferLock) _recentBuffer.Clear();
+
+                _micCapture.DataAvailable += OnMicDataAvailable;
+                _sysCapture.DataAvailable += OnSysDataAvailable;
+
+                _sysCapture.RecordingStopped += (s, e) =>
+                {
+                    if (e.Exception != null) RecordingError?.Invoke(this, e.Exception.Message);
+                };
+
+                _micCapture.StartRecording();
+                _sysCapture.StartRecording();
+
+                Log.Information("Both-mode recording started: mic={Mic} output={Path}", deviceId, outputPath);
             }
             else
             {
-                MMDevice device = deviceId != null
-                    ? enumerator.GetDevice(deviceId)
-                    : enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-                _capture = new WasapiCapture(device);
+                _isMixMode = false;
+
+                if (sourceType == AudioSourceType.SystemAudio)
+                {
+                    MMDevice device = deviceId != null
+                        ? enumerator.GetDevice(deviceId)
+                        : enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                    _capture = new WasapiLoopbackCapture(device);
+                }
+                else
+                {
+                    MMDevice device = deviceId != null
+                        ? enumerator.GetDevice(deviceId)
+                        : enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                    _capture = new WasapiCapture(device);
+                }
+
+                _captureFormat = _capture.WaveFormat;
+                _bufferFormat = _captureFormat;
+                Log.Information("Recording started: {Source} device={DeviceId} format={Format} output={Path}",
+                    sourceType, deviceId, _captureFormat, outputPath);
+                _writer = new WaveFileWriter(outputPath, _captureFormat);
+
+                lock (_bufferLock) _recentBuffer.Clear();
+
+                _capture.DataAvailable += OnDataAvailable;
+                _capture.RecordingStopped += (s, e) =>
+                {
+                    if (e.Exception != null) RecordingError?.Invoke(this, e.Exception.Message);
+                };
+                _capture.StartRecording();
             }
 
-            _captureFormat = _capture.WaveFormat;
-            Log.Information("Recording started: {Source} device={DeviceId} format={Format} output={Path}",
-                sourceType, deviceId, _captureFormat, outputPath);
-            _writer = new WaveFileWriter(outputPath, _captureFormat);
-
-            lock (_bufferLock) _recentBuffer.Clear();
-
-            _capture.DataAvailable += OnDataAvailable;
-
-            _capture.RecordingStopped += (s, e) =>
-            {
-                if (e.Exception != null)
-                    RecordingError?.Invoke(this, e.Exception.Message);
-            };
-
-            _capture.StartRecording();
             _stopwatch.Restart();
             _isPaused = false;
         }
@@ -108,62 +165,77 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         if (_isPaused || _writer == null || e.BytesRecorded == 0) return;
-
         try
         {
             _writer.Write(e.Buffer, 0, e.BytesRecorded);
-
-            // Keep recent audio in memory for live captions
-            lock (_bufferLock)
-            {
-                _recentBuffer.AddRange(e.Buffer.AsSpan(0, e.BytesRecorded).ToArray());
-
-                // Trim to max buffer size
-                if (_captureFormat != null)
-                {
-                    int maxBytes = _captureFormat.AverageBytesPerSecond * MaxBufferSeconds;
-                    if (_recentBuffer.Count > maxBytes)
-                    {
-                        _recentBuffer.RemoveRange(0, _recentBuffer.Count - maxBytes);
-                    }
-                }
-            }
-
-            // Calculate audio level for visualization
-            float max = 0;
-            if (_captureFormat?.BitsPerSample == 32 && _captureFormat.Encoding == WaveFormatEncoding.IeeeFloat)
-            {
-                for (int i = 0; i < e.BytesRecorded - 3; i += 4)
-                {
-                    float sample = Math.Abs(BitConverter.ToSingle(e.Buffer, i));
-                    if (sample > max) max = sample;
-                }
-            }
-            else if (_captureFormat?.BitsPerSample == 16)
-            {
-                for (int i = 0; i < e.BytesRecorded - 1; i += 2)
-                {
-                    short sample = BitConverter.ToInt16(e.Buffer, i);
-                    float sampleF = Math.Abs(sample / 32768f);
-                    if (sampleF > max) max = sampleF;
-                }
-            }
-
-            AudioLevelChanged?.Invoke(this, Math.Min(max, 1.0f));
+            UpdateBuffer(e.Buffer, e.BytesRecorded);
+            UpdateAudioLevel(e.Buffer, e.BytesRecorded, _captureFormat);
         }
         catch { }
     }
 
-    /// <summary>
-    /// Writes the recent audio buffer to a temporary WAV file converted to Whisper format.
-    /// Returns the path, or null if no data available.
-    /// LastSnapshotError contains diagnostic info if null is returned.
-    /// </summary>
+    private void OnMicDataAvailable(object? sender, WaveInEventArgs e)
+    {
+        if (_isPaused || _micWriter == null || e.BytesRecorded == 0) return;
+        try { _micWriter.Write(e.Buffer, 0, e.BytesRecorded); }
+        catch { }
+    }
+
+    private void OnSysDataAvailable(object? sender, WaveInEventArgs e)
+    {
+        if (_isPaused || _sysWriter == null || e.BytesRecorded == 0) return;
+        try
+        {
+            _sysWriter.Write(e.Buffer, 0, e.BytesRecorded);
+            UpdateBuffer(e.Buffer, e.BytesRecorded);
+            UpdateAudioLevel(e.Buffer, e.BytesRecorded, _bufferFormat);
+        }
+        catch { }
+    }
+
+    private void UpdateBuffer(byte[] buffer, int bytesRecorded)
+    {
+        lock (_bufferLock)
+        {
+            _recentBuffer.AddRange(buffer.AsSpan(0, bytesRecorded).ToArray());
+            if (_bufferFormat != null)
+            {
+                int maxBytes = _bufferFormat.AverageBytesPerSecond * MaxBufferSeconds;
+                if (_recentBuffer.Count > maxBytes)
+                    _recentBuffer.RemoveRange(0, _recentBuffer.Count - maxBytes);
+            }
+        }
+    }
+
+    private void UpdateAudioLevel(byte[] buffer, int bytesRecorded, WaveFormat? format)
+    {
+        float max = 0;
+        if (format?.BitsPerSample == 32 && format.Encoding == WaveFormatEncoding.IeeeFloat)
+        {
+            for (int i = 0; i < bytesRecorded - 3; i += 4)
+            {
+                float sample = Math.Abs(BitConverter.ToSingle(buffer, i));
+                if (sample > max) max = sample;
+            }
+        }
+        else if (format?.BitsPerSample == 16)
+        {
+            for (int i = 0; i < bytesRecorded - 1; i += 2)
+            {
+                short sample = BitConverter.ToInt16(buffer, i);
+                float sampleF = Math.Abs(sample / 32768f);
+                if (sampleF > max) max = sampleF;
+            }
+        }
+        AudioLevelChanged?.Invoke(this, Math.Min(max, 1.0f));
+    }
+
     public string? LastSnapshotError { get; private set; }
 
     public string? CreateSnapshotForTranscription(string tempDir)
     {
-        if (_captureFormat == null)
+        var format = _bufferFormat;
+        if (format == null)
         {
             LastSnapshotError = "No capture format";
             return null;
@@ -177,9 +249,9 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
                 LastSnapshotError = "Buffer is empty — no audio data received";
                 return null;
             }
-            if (_recentBuffer.Count < _captureFormat.AverageBytesPerSecond)
+            if (_recentBuffer.Count < format.AverageBytesPerSecond)
             {
-                LastSnapshotError = $"Buffer too small ({_recentBuffer.Count} bytes, need {_captureFormat.AverageBytesPerSecond})";
+                LastSnapshotError = $"Buffer too small ({_recentBuffer.Count} bytes, need {format.AverageBytesPerSecond})";
                 return null;
             }
             data = _recentBuffer.ToArray();
@@ -192,8 +264,7 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             rawPath = Path.Combine(tempDir, $"caption_raw_{Guid.NewGuid():N}.wav");
             var convertedPath = Path.Combine(tempDir, $"caption_{Guid.NewGuid():N}.wav");
 
-            // Write raw WAV in capture format
-            using (var writer = new WaveFileWriter(rawPath, _captureFormat))
+            using (var writer = new WaveFileWriter(rawPath, format))
             {
                 writer.Write(data, 0, data.Length);
             }
@@ -206,7 +277,6 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
                 return null;
             }
 
-            // Try conversion, fall back to raw file if it fails
             try
             {
                 new WindowsAudioConverter().ConvertToWhisperFormat(rawPath, convertedPath);
@@ -225,8 +295,6 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             }
             catch (Exception convEx)
             {
-                // Conversion failed — try feeding raw file directly
-                // Whisper.net can often handle various formats
                 Log.Warning(convEx, "Audio conversion failed for live caption, falling back to raw audio");
                 try { File.Delete(convertedPath); } catch { }
                 LastSnapshotError = $"Conversion failed ({convEx.Message}), using raw audio";
@@ -242,25 +310,130 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
         }
     }
 
-    public Task StopRecordingAsync()
+    public async Task StopRecordingAsync()
     {
         _stopwatch.Stop();
 
-        if (_capture != null)
+        if (_isMixMode)
         {
-            _capture.DataAvailable -= OnDataAvailable;
-            _capture.StopRecording();
+            // Stop both captures
+            if (_micCapture != null)
+            {
+                _micCapture.DataAvailable -= OnMicDataAvailable;
+                _micCapture.StopRecording();
+            }
+            if (_sysCapture != null)
+            {
+                _sysCapture.DataAvailable -= OnSysDataAvailable;
+                _sysCapture.StopRecording();
+            }
+
+            _micWriter?.Dispose();
+            _sysWriter?.Dispose();
+            _micCapture?.Dispose();
+            _sysCapture?.Dispose();
+            _micWriter = null;
+            _sysWriter = null;
+            _micCapture = null;
+            _sysCapture = null;
+
+            // Mix mic + system audio into final output
+            if (_mixFinalPath != null && _micTempPath != null && _sysTempPath != null)
+            {
+                await Task.Run(() => MixAudioFiles(_micTempPath, _sysTempPath, _mixFinalPath));
+            }
+
+            _mixFinalPath = null;
+            _micTempPath = null;
+            _sysTempPath = null;
+            _isMixMode = false;
+        }
+        else
+        {
+            if (_capture != null)
+            {
+                _capture.DataAvailable -= OnDataAvailable;
+                _capture.StopRecording();
+            }
+
+            _writer?.Dispose();
+            _capture?.Dispose();
+            _writer = null;
+            _capture = null;
         }
 
-        _writer?.Dispose();
-        _capture?.Dispose();
-        _writer = null;
-        _capture = null;
+        _captureFormat = null;
+        _bufferFormat = null;
         _isPaused = false;
-
         lock (_bufferLock) _recentBuffer.Clear();
+    }
 
-        return Task.CompletedTask;
+    private static void MixAudioFiles(string micPath, string sysPath, string outputPath)
+    {
+        try
+        {
+            var micExists = File.Exists(micPath) && new FileInfo(micPath).Length > 1000;
+            var sysExists = File.Exists(sysPath) && new FileInfo(sysPath).Length > 1000;
+
+            if (!micExists && !sysExists)
+            {
+                Log.Warning("Both mix files missing or empty, output will be empty");
+                return;
+            }
+
+            if (!micExists)
+            {
+                // Only sys audio — just copy it
+                File.Copy(sysPath, outputPath, overwrite: true);
+                Log.Warning("Mic temp file missing, using system audio only");
+            }
+            else if (!sysExists)
+            {
+                File.Copy(micPath, outputPath, overwrite: true);
+                Log.Warning("Sys temp file missing, using mic audio only");
+            }
+            else
+            {
+                // Mix both: AudioFileReader resamples to a common IEEE float format
+                using var micReader = new AudioFileReader(micPath);
+                using var sysReader = new AudioFileReader(sysPath);
+
+                // Resample to a matching sample rate (use the sys format as base)
+                ISampleProvider micSamples = micReader;
+                ISampleProvider sysSamples = sysReader;
+
+                if (micReader.WaveFormat.SampleRate != sysReader.WaveFormat.SampleRate ||
+                    micReader.WaveFormat.Channels != sysReader.WaveFormat.Channels)
+                {
+                    // Resample mic to match sys format
+                    micSamples = new WdlResamplingSampleProvider(micReader,
+                        sysReader.WaveFormat.SampleRate);
+                    if (sysReader.WaveFormat.Channels != micReader.WaveFormat.Channels)
+                    {
+                        micSamples = micReader.WaveFormat.Channels == 1
+                            ? new MonoToStereoSampleProvider(micSamples)
+                            : (ISampleProvider)new StereoToMonoSampleProvider(micSamples);
+                    }
+                }
+
+                var mixer = new MixingSampleProvider(new[] { micSamples, sysSamples });
+                WaveFileWriter.CreateWaveFile16(outputPath, mixer);
+
+                Log.Information("Mixed mic + system audio to {Output}", outputPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to mix audio files");
+            // Fallback: use sys audio if it exists
+            if (File.Exists(sysPath) && new FileInfo(sysPath).Length > 1000)
+                try { File.Copy(sysPath, outputPath, overwrite: true); } catch { }
+        }
+        finally
+        {
+            try { if (File.Exists(micPath)) File.Delete(micPath); } catch { }
+            try { if (File.Exists(sysPath)) File.Delete(sysPath); } catch { }
+        }
     }
 
     public void PauseRecording()
@@ -279,6 +452,10 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
     {
         _writer?.Dispose();
         _capture?.Dispose();
+        _micWriter?.Dispose();
+        _sysWriter?.Dispose();
+        _micCapture?.Dispose();
+        _sysCapture?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

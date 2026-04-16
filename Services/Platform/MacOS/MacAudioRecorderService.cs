@@ -60,9 +60,34 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
     {
         try
         {
-            var input = deviceId ?? "default";
-            // ffmpeg -f avfoundation -i ":deviceId" -ar 16000 -ac 1 output.wav
-            var args = $"-f avfoundation -i \":{input}\" -ar 16000 -ac 1 -y \"{outputPath}\"";
+            string args;
+            if (sourceType == AudioSourceType.Both)
+            {
+                // Try to find a loopback device (BlackHole, Soundflower, etc.)
+                var loopbackDevices = GetLoopbackDevices();
+                var mic = deviceId ?? "0";
+
+                if (loopbackDevices.Count > 0)
+                {
+                    var loopback = loopbackDevices[0].Id;
+                    // Mix mic + loopback using ffmpeg amix
+                    args = $"-f avfoundation -i \":{mic}\" -f avfoundation -i \":{loopback}\" " +
+                           $"-filter_complex amix=inputs=2:duration=longest:dropout_transition=0 " +
+                           $"-ar 16000 -ac 1 -y \"{outputPath}\"";
+                    Log.Information("macOS Both-mode: mic={Mic} loopback={Loopback} output={Path}", mic, loopback, outputPath);
+                }
+                else
+                {
+                    // No loopback device found — record mic only
+                    args = $"-f avfoundation -i \":{mic}\" -ar 16000 -ac 1 -y \"{outputPath}\"";
+                    Log.Warning("No loopback device found on macOS (install BlackHole for system audio). Recording mic only.");
+                }
+            }
+            else
+            {
+                var input = deviceId ?? "0";
+                args = $"-f avfoundation -i \":{input}\" -ar 16000 -ac 1 -y \"{outputPath}\"";
+            }
 
             _recordProcess = new Process
             {
@@ -81,7 +106,7 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
             _isPaused = false;
             _currentOutputPath = outputPath;
 
-            Log.Information("macOS recording started: device={Device} output={Path}", deviceId, outputPath);
+            Log.Information("macOS recording started: source={Source} device={Device} output={Path}", sourceType, deviceId, outputPath);
         }
         catch (Exception ex)
         {

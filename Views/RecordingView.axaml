@@ -88,7 +88,9 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Spacing="6" Margin="8,0,0,0">
-                            <TextBlock Text="Device" FontSize="12" Foreground="#6c7086"/>
+                            <TextBlock FontSize="12" Foreground="#6c7086"
+                                       Text="{Binding SelectedAudioSource,
+                                           Converter={x:Static views:RecordingView.DeviceLabelConverter}}"/>
                             <ComboBox ItemsSource="{Binding Devices}"
                                       SelectedItem="{Binding SelectedDevice}"
                                       HorizontalAlignment="Stretch"

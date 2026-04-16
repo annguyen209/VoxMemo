@@ -30,6 +30,7 @@ public class Transcript
     public string? Model { get; set; }
     public string? Language { get; set; }
     public string? FullText { get; set; }
+    public string? OriginalFullText { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Meeting? Meeting { get; set; }

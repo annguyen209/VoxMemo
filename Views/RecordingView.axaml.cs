@@ -17,11 +17,20 @@ public partial class RecordingView : UserControl
                 ? "Captions update every ~12 seconds using local Whisper"
                 : "Enable live captions before recording to see real-time text");
 
+    public static readonly IValueConverter DeviceLabelConverter =
+        new FuncValueConverter<string?, string>(source => source switch
+        {
+            "Both (Mic + Speaker)" => "Microphone Device",
+            "System Audio" => "Output Device",
+            _ => "Device"
+        });
+
     public static readonly IValueConverter SourceHintConverter =
         new FuncValueConverter<string?, string>(source => source switch
         {
             "System Audio" => "Records all sound playing on your computer (meeting audio, speakers, etc.)",
-            _ => "Records from your microphone (your voice)"
+            "Both (Mic + Speaker)" => "Captures your mic + speaker output mixed together — best for meeting transcription",
+            _ => "Records from your microphone (your voice only)"
         });
 
     public RecordingView()

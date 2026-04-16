@@ -8,6 +8,7 @@ public enum AudioSourceType
 {
     Microphone,
     SystemAudio,
+    Both,           // Mix microphone + system audio (for meeting capture)
 }
 
 public record AudioDevice(string Id, string Name, bool IsLoopback);

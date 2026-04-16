@@ -531,6 +531,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (transcript != null)
             {
+                if (string.IsNullOrEmpty(transcript.OriginalFullText))
+                    transcript.OriginalFullText = transcript.FullText;
                 transcript.FullText = result;
                 await db.SaveChangesAsync();
             }
@@ -541,7 +543,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
+                    if (string.IsNullOrEmpty(vm.OriginalTranscriptText))
+                        vm.OriginalTranscriptText = transcriptText;
                     vm.TranscriptText = result;
+                    vm.ShowOriginalTranscript = false;
                     vm.StatusMessage = "Speakers identified";
                 }
             });

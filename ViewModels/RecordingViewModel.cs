@@ -46,7 +46,7 @@ public partial class RecordingViewModel : ViewModelBase
 
     // Audio source: user picks Microphone or System Audio
     [ObservableProperty]
-    private string _selectedAudioSource = "System Audio";
+    private string _selectedAudioSource = "Both (Mic + Speaker)";
 
     [ObservableProperty]
     private ObservableCollection<AudioDeviceItem> _devices = [];
@@ -70,7 +70,7 @@ public partial class RecordingViewModel : ViewModelBase
     /// <summary>Raised when a recording is saved so Meetings can refresh.</summary>
     public event EventHandler<string>? RecordingSaved;
 
-    public ObservableCollection<string> AudioSources { get; } = ["Microphone", "System Audio"];
+    public ObservableCollection<string> AudioSources { get; } = ["Microphone", "System Audio", "Both (Mic + Speaker)"];
     public ObservableCollection<string> Platforms { get; } = ["Zoom", "Teams", "Google Meet", "Other"];
     public ObservableCollection<string> Languages { get; } = new(LoadEnabledLanguages());
 
@@ -133,14 +133,16 @@ public partial class RecordingViewModel : ViewModelBase
         if (_recorder == null) return;
 
         Devices.Clear();
+        // "Both" mode: user picks the microphone; system audio is auto-selected (default loopback)
         var deviceList = SelectedAudioSource == "System Audio"
             ? _recorder.GetLoopbackDevices()
             : _recorder.GetInputDevices();
 
+        Devices.Add(new AudioDeviceItem(null, "Auto (Default)", false));
         foreach (var d in deviceList)
             Devices.Add(new AudioDeviceItem(d.Id, d.Name, d.IsLoopback));
 
-        SelectedDevice = Devices.Count > 0 ? Devices[0] : null;
+        SelectedDevice = Devices[0];
     }
 
     private async Task<string> GetStoragePathAsync()
@@ -161,7 +163,12 @@ public partial class RecordingViewModel : ViewModelBase
     [RelayCommand]
     private async Task StartRecordingAsync()
     {
-        if (_recorder == null || SelectedDevice == null)
+        if (_recorder == null)
+        {
+            StatusMessage = "No audio recorder available";
+            return;
+        }
+        if (SelectedDevice == null && SelectedAudioSource != "System Audio")
         {
             StatusMessage = "No audio device selected";
             return;
@@ -174,19 +181,26 @@ public partial class RecordingViewModel : ViewModelBase
         _currentAudioPath = Path.Combine(audioDir, $"meeting_{DateTime.Now:yyyyMMdd_HHmmss}.wav");
         _recordingStartedAt = DateTime.UtcNow;
 
-        var sourceType = SelectedAudioSource == "System Audio"
-            ? AudioSourceType.SystemAudio
-            : AudioSourceType.Microphone;
+        var sourceType = SelectedAudioSource switch
+        {
+            "System Audio" => AudioSourceType.SystemAudio,
+            "Both (Mic + Speaker)" => AudioSourceType.Both,
+            _ => AudioSourceType.Microphone
+        };
 
+        // For "Both" mode, deviceId is the microphone; system audio uses default loopback automatically
+        var deviceId = sourceType == AudioSourceType.Both ? SelectedDevice?.Id : SelectedDevice?.Id;
         Log.Information("Starting recording: source={Source} device={Device} path={Path}",
-            SelectedAudioSource, SelectedDevice.Name, _currentAudioPath);
-        await _recorder.StartRecordingAsync(_currentAudioPath, sourceType, SelectedDevice.Id);
+            SelectedAudioSource, SelectedDevice?.Name, _currentAudioPath);
+        await _recorder.StartRecordingAsync(_currentAudioPath, sourceType, deviceId);
 
         IsRecording = true;
         IsPaused = false;
         ElapsedTime = "00:00:00";
         MeetingTitle = string.Empty;
-        StatusMessage = $"Recording from {SelectedAudioSource}...";
+        StatusMessage = sourceType == AudioSourceType.Both
+            ? $"Recording mic + speaker (mixed)..."
+            : $"Recording from {SelectedAudioSource}...";
         LiveCaptionText = string.Empty;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -409,7 +423,7 @@ public partial class RecordingViewModel : ViewModelBase
     private void RefreshDevices() => RefreshDeviceList();
 }
 
-public record AudioDeviceItem(string Id, string Name, bool IsLoopback)
+public record AudioDeviceItem(string? Id, string Name, bool IsLoopback)
 {
     public override string ToString() => Name;
 }
