@@ -6,9 +6,9 @@
     <ApplicationManifest Condition="$([MSBuild]::IsOSPlatform('Windows'))">app.manifest</ApplicationManifest>
     <RootNamespace>VoxMemo</RootNamespace>
     <AssemblyName>VoxMemo</AssemblyName>
-    <Version>1.1.0</Version>
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <NoWarn>CA1416;CA2024;CS0067</NoWarn>
     <ApplicationIcon>Assets\voxmemo-icon.ico</ApplicationIcon>
@@ -38,6 +38,7 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Serilog" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.*" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
     <PackageReference Include="Whisper.net" Version="1.8.0" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.8.0" />
     <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.8.0" />

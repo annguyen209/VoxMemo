@@ -340,7 +340,12 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             // Mix mic + system audio into final output
             if (_mixFinalPath != null && _micTempPath != null && _sysTempPath != null)
             {
-                await Task.Run(() => MixAudioFiles(_micTempPath, _sysTempPath, _mixFinalPath));
+                await Task.Run(() =>
+                    WindowsRecordingRecoveryService.TryCreateMixedRecording(
+                        _micTempPath,
+                        _sysTempPath,
+                        _mixFinalPath,
+                        cleanupInputsOnSuccess: true));
             }
 
             _mixFinalPath = null;
@@ -366,74 +371,6 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
         _bufferFormat = null;
         _isPaused = false;
         lock (_bufferLock) _recentBuffer.Clear();
-    }
-
-    private static void MixAudioFiles(string micPath, string sysPath, string outputPath)
-    {
-        try
-        {
-            var micExists = File.Exists(micPath) && new FileInfo(micPath).Length > 1000;
-            var sysExists = File.Exists(sysPath) && new FileInfo(sysPath).Length > 1000;
-
-            if (!micExists && !sysExists)
-            {
-                Log.Warning("Both mix files missing or empty, output will be empty");
-                return;
-            }
-
-            if (!micExists)
-            {
-                // Only sys audio — just copy it
-                File.Copy(sysPath, outputPath, overwrite: true);
-                Log.Warning("Mic temp file missing, using system audio only");
-            }
-            else if (!sysExists)
-            {
-                File.Copy(micPath, outputPath, overwrite: true);
-                Log.Warning("Sys temp file missing, using mic audio only");
-            }
-            else
-            {
-                // Mix both: AudioFileReader resamples to a common IEEE float format
-                using var micReader = new AudioFileReader(micPath);
-                using var sysReader = new AudioFileReader(sysPath);
-
-                // Resample to a matching sample rate (use the sys format as base)
-                ISampleProvider micSamples = micReader;
-                ISampleProvider sysSamples = sysReader;
-
-                if (micReader.WaveFormat.SampleRate != sysReader.WaveFormat.SampleRate ||
-                    micReader.WaveFormat.Channels != sysReader.WaveFormat.Channels)
-                {
-                    // Resample mic to match sys format
-                    micSamples = new WdlResamplingSampleProvider(micReader,
-                        sysReader.WaveFormat.SampleRate);
-                    if (sysReader.WaveFormat.Channels != micReader.WaveFormat.Channels)
-                    {
-                        micSamples = micReader.WaveFormat.Channels == 1
-                            ? new MonoToStereoSampleProvider(micSamples)
-                            : (ISampleProvider)new StereoToMonoSampleProvider(micSamples);
-                    }
-                }
-
-                var mixer = new MixingSampleProvider(new[] { micSamples, sysSamples });
-                WaveFileWriter.CreateWaveFile16(outputPath, mixer);
-
-                Log.Information("Mixed mic + system audio to {Output}", outputPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to mix audio files");
-            // Fallback: use sys audio if it exists
-            if (File.Exists(sysPath) && new FileInfo(sysPath).Length > 1000)
-                try { File.Copy(sysPath, outputPath, overwrite: true); } catch { }
-        }
-        finally
-        {
-            try { if (File.Exists(micPath)) File.Delete(micPath); } catch { }
-            try { if (File.Exists(sysPath)) File.Delete(sysPath); } catch { }
-        }
     }
 
     public void PauseRecording()

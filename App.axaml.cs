@@ -56,8 +56,12 @@ public partial class App : Application
 
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // Rebuild tray menu on any recording state change
-            _mainVm.Recording.PropertyChanged += (_, _) => RebuildTrayMenu();
+            // Only rebuild when tray-visible state actually changes.
+            _mainVm.Recording.PropertyChanged += (_, e) =>
+            {
+                if (ShouldRebuildTrayMenu(e.PropertyName))
+                    RebuildTrayMenu();
+            };
 
             // Rebuild when enabled languages change
             SettingsViewModel.EnabledLanguagesChanged += (_, _) => RebuildTrayMenu();
@@ -71,6 +75,8 @@ public partial class App : Application
 
             desktop.ShutdownRequested += (_, _) =>
             {
+                if (desktop.MainWindow is MainWindow mainWindow)
+                    mainWindow.PrepareForExit();
                 Services.Platform.PlatformServices.GlobalHotkey.Dispose();
             };
         }
@@ -79,8 +85,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Rebuilds the entire tray menu from current ViewModel state.
-    /// Called on every property change — simple, always consistent.
+    /// Rebuilds the tray menu when recording state or selections change.
     /// </summary>
     private void RebuildTrayMenu()
     {
@@ -193,12 +198,23 @@ public partial class App : Application
         exitItem.Click += (_, _) =>
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d)
+            {
+                if (d.MainWindow is MainWindow mainWindow)
+                    mainWindow.PrepareForExit();
                 d.Shutdown();
+            }
         };
         menu.Items.Add(exitItem);
 
         tray.Menu = menu;
     }
+
+    private static bool ShouldRebuildTrayMenu(string? propertyName) => propertyName is
+        nameof(RecordingViewModel.IsRecording) or
+        nameof(RecordingViewModel.IsPaused) or
+        nameof(RecordingViewModel.SelectedAudioSource) or
+        nameof(RecordingViewModel.SelectedDevice) or
+        nameof(RecordingViewModel.SelectedLanguage);
 
     // Show notification on recording state change
     private void OnRecordingStateChanged()

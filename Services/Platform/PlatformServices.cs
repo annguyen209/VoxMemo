@@ -92,6 +92,7 @@ public static class PlatformServices
             Notifications = new Windows.WindowsNotificationService();
             GlobalHotkey = new Windows.WindowsGlobalHotkeyService();
             Startup = new Windows.WindowsStartupService();
+            Windows.WindowsRecordingRecoveryService.RecoverInterruptedRecordings();
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {

@@ -1,12 +1,12 @@
 [Setup]
 AppName=VoxMemo
-AppVersion=1.0.0
+AppVersion=1.2.0
 AppPublisher=Anzdev4life
 AppPublisherURL=https://github.com/annguyen209/VoxMemo
 DefaultDirName={autopf}\VoxMemo
 DefaultGroupName=VoxMemo
 OutputDir=publish
-OutputBaseFilename=VoxMemo-v1.0.0-Setup
+OutputBaseFilename=VoxMemo-v1.2.0-Setup
 Compression=lzma2
 SolidCompression=yes
 SetupIconFile=Assets\voxmemo-icon.ico

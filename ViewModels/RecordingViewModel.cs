@@ -203,7 +203,7 @@ public partial class RecordingViewModel : ViewModelBase
             : $"Recording from {SelectedAudioSource}...";
         LiveCaptionText = string.Empty;
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
         {
             if (_recorder != null)
