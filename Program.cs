@@ -16,7 +16,7 @@ sealed class Program
         Directory.CreateDirectory(logDir);
 
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
+            .MinimumLevel.Debug()
             .WriteTo.File(
                 Path.Combine(logDir, "voxmemo-.log"),
                 rollingInterval: RollingInterval.Day,

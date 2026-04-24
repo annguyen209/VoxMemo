@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VoxMemo.Models;
 
@@ -24,9 +25,35 @@ public class AppDbContext : DbContext
         _dbPath = Path.Combine(appData, "voxmemo.db");
     }
 
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+        var appData = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VoxMemo");
+        Directory.CreateDirectory(appData);
+        _dbPath = Path.Combine(appData, "voxmemo.db");
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
         options.UseSqlite($"Data Source={_dbPath}");
+    }
+
+    public async Task EnsureMigratedAsync()
+    {
+        await Database.EnsureCreatedAsync();
+        
+        // Add EncryptedValue column if it doesn't exist (for existing databases)
+        try
+        {
+            await Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE AppSettings ADD COLUMN EncryptedValue TEXT;
+            ");
+        }
+        catch
+        {
+            // Column already exists, ignore
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

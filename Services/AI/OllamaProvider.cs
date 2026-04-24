@@ -28,8 +28,13 @@ public class OllamaProvider : IAiProvider
     {
         try
         {
+            Log.Debug("Ollama: Fetching available models from {BaseUrl}", _baseUrl);
             var response = await _http.GetAsync($"{_baseUrl}/api/tags", ct);
-            if (!response.IsSuccessStatusCode) return [];
+            if (!response.IsSuccessStatusCode)
+            {
+                Log.Warning("Ollama: GetAvailableModels returned {StatusCode}", response.StatusCode);
+                return [];
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
@@ -44,10 +49,22 @@ public class OllamaProvider : IAiProvider
                 }
             }
 
+            Log.Information("Ollama: Found {Count} available models", models.Count);
             return models;
         }
-        catch
+        catch (HttpRequestException ex)
         {
+            Log.Error(ex, "Ollama: HTTP error fetching models - server may be offline");
+            return [];
+        }
+        catch (TaskCanceledException ex) when (ex.CancellationToken != ct)
+        {
+            Log.Error(ex, "Ollama: Timeout fetching models");
+            return [];
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ollama: Error fetching available models");
             return [];
         }
     }
@@ -60,8 +77,10 @@ public class OllamaProvider : IAiProvider
         CancellationToken ct = default)
     {
         var systemPrompt = PromptTemplates.GetSystemPrompt(promptType, language);
+        var transcriptLength = transcript.Length;
 
-        Log.Debug("Ollama SummarizeAsync: model={Model} promptType={PromptType}", model, promptType);
+        Log.Information("Ollama: Starting summarization - model={Model} promptType={PromptType} transcriptChars={Chars}", 
+            model, promptType, transcriptLength);
 
         var request = new
         {
@@ -83,17 +102,31 @@ public class OllamaProvider : IAiProvider
         if (!response.IsSuccessStatusCode)
         {
             var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            Log.Error("Ollama: Summarization failed with {StatusCode}: {Error}", response.StatusCode, preview);
             throw new HttpRequestException($"Ollama returned {(int)response.StatusCode}: {preview}");
         }
 
-        using var doc = JsonDocument.Parse(responseJson);
+        string result;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseJson);
 
-        var result = doc.RootElement
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString() ?? string.Empty;
+            if (!doc.RootElement.TryGetProperty("message", out var message) ||
+                !message.TryGetProperty("content", out var contentElement))
+            {
+                Log.Error("Ollama: Invalid response structure - missing 'message.content'");
+                throw new InvalidOperationException("Ollama response missing 'message.content'");
+            }
 
-        Log.Debug("Ollama SummarizeAsync completed: {Length} chars", result.Length);
+            result = contentElement.GetString() ?? string.Empty;
+        }
+        catch (JsonException ex)
+        {
+            Log.Error(ex, "Ollama: Failed to parse JSON response");
+            throw new InvalidOperationException("Ollama returned invalid JSON", ex);
+        }
+
+        Log.Information("Ollama: Summarization completed - {Length} chars", result.Length);
         return result;
     }
 

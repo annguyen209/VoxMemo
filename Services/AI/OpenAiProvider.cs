@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Serilog;
 
 namespace VoxMemo.Services.AI;
 
@@ -30,9 +31,9 @@ public class OpenAiProvider : IAiProvider
 
     public async Task<List<AiModel>> GetAvailableModelsAsync(CancellationToken ct = default)
     {
-        // Try fetching models from the API (works with LM Studio, vLLM, LocalAI, etc.)
         try
         {
+            Log.Debug("OpenAI: Fetching available models from {BaseUrl}", _baseUrl);
             var response = await _http.GetAsync($"{_baseUrl}/models", ct);
             if (response.IsSuccessStatusCode)
             {
@@ -46,10 +47,25 @@ public class OpenAiProvider : IAiProvider
                     models.Add(new AiModel(id, id));
                 }
 
-                if (models.Count > 0) return models;
+                if (models.Count > 0)
+                {
+                    Log.Information("OpenAI: Found {Count} available models", models.Count);
+                    return models;
+                }
+            }
+            else
+            {
+                Log.Warning("OpenAI: GetAvailableModels returned {StatusCode}", response.StatusCode);
             }
         }
-        catch { }
+        catch (HttpRequestException ex)
+        {
+            Log.Error(ex, "OpenAI: HTTP error fetching models");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "OpenAI: Error fetching available models");
+        }
 
         return [];
     }
@@ -62,6 +78,10 @@ public class OpenAiProvider : IAiProvider
         CancellationToken ct = default)
     {
         var systemPrompt = PromptTemplates.GetSystemPrompt(promptType, language);
+        var transcriptLength = transcript.Length;
+
+        Log.Information("OpenAI: Starting summarization - model={Model} promptType={PromptType} transcriptChars={Chars}", 
+            model, promptType, transcriptLength);
 
         var request = new
         {
@@ -84,36 +104,61 @@ public class OpenAiProvider : IAiProvider
         if (!response.IsSuccessStatusCode)
         {
             var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            Log.Error("OpenAI: Summarization failed with {StatusCode}: {Error}", response.StatusCode, preview);
             throw new HttpRequestException($"API returned {(int)response.StatusCode} {response.ReasonPhrase}: {preview}");
         }
 
-        // Some servers return NDJSON (multiple JSON lines) even with stream=false
-        // Take just the first valid JSON object
-        var jsonToParse = responseJson.Trim();
-        if (jsonToParse.Contains('\n'))
+        string result;
+        try
         {
-            var lines = jsonToParse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            // Find the line that contains "choices"
-            foreach (var line in lines)
+            var jsonToParse = responseJson.Trim();
+            if (jsonToParse.Contains('\n'))
             {
-                var trimmed = line.Trim();
-                if (trimmed.StartsWith("data: ")) trimmed = trimmed["data: ".Length..];
-                if (trimmed == "[DONE]") continue;
-                if (trimmed.StartsWith('{') && trimmed.Contains("choices"))
+                var lines = jsonToParse.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
                 {
-                    jsonToParse = trimmed;
-                    break;
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("data: ")) trimmed = trimmed["data: ".Length..];
+                    if (trimmed == "[DONE]") continue;
+                    if (trimmed.StartsWith('{') && trimmed.Contains("choices"))
+                    {
+                        jsonToParse = trimmed;
+                        break;
+                    }
                 }
             }
+
+            using var doc = JsonDocument.Parse(jsonToParse);
+
+            if (!doc.RootElement.TryGetProperty("choices", out var choices) ||
+                choices.GetArrayLength() == 0)
+            {
+                Log.Error("OpenAI: Invalid response - no choices in response");
+                throw new InvalidOperationException("OpenAI response has no choices");
+            }
+
+            if (!choices[0].TryGetProperty("message", out var message) ||
+                !message.TryGetProperty("content", out var contentElement))
+            {
+                Log.Error("OpenAI: Invalid response structure - missing message.content");
+                throw new InvalidOperationException("OpenAI response missing message.content");
+            }
+
+            result = contentElement.GetString() ?? string.Empty;
+        }
+        catch (JsonException ex)
+        {
+            Log.Error(ex, "OpenAI: Failed to parse JSON response");
+            throw new InvalidOperationException("OpenAI returned invalid JSON", ex);
+        }
+        catch (Exception ex) when (ex is not HttpRequestException && ex is not InvalidOperationException)
+        {
+            Log.Error(ex, "OpenAI: Error parsing response");
+            throw;
         }
 
-        using var doc = JsonDocument.Parse(jsonToParse);
-
-        return doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString() ?? string.Empty;
+        Log.Information("OpenAI: Summarization completed - {Length} chars", result.Length);
+        return result;
     }
 
     public async IAsyncEnumerable<string> SummarizeStreamAsync(

@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Serilog;
 
 namespace VoxMemo.Services.AI;
 
@@ -29,6 +30,7 @@ public class AnthropicProvider : IAiProvider
     {
         try
         {
+            Log.Debug("Anthropic: Fetching available models from {BaseUrl}", _baseUrl);
             var response = await _http.GetAsync($"{_baseUrl}/v1/models", ct);
             if (response.IsSuccessStatusCode)
             {
@@ -44,10 +46,25 @@ public class AnthropicProvider : IAiProvider
                     models.Add(new AiModel(id, name));
                 }
 
-                if (models.Count > 0) return models;
+                if (models.Count > 0)
+                {
+                    Log.Information("Anthropic: Found {Count} available models", models.Count);
+                    return models;
+                }
+            }
+            else
+            {
+                Log.Warning("Anthropic: GetAvailableModels returned {StatusCode}", response.StatusCode);
             }
         }
-        catch { }
+        catch (HttpRequestException ex)
+        {
+            Log.Error(ex, "Anthropic: HTTP error fetching models");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Anthropic: Error fetching available models");
+        }
 
         return [];
     }
@@ -60,6 +77,10 @@ public class AnthropicProvider : IAiProvider
         CancellationToken ct = default)
     {
         var systemPrompt = PromptTemplates.GetSystemPrompt(promptType, language);
+        var transcriptLength = transcript.Length;
+
+        Log.Information("Anthropic: Starting summarization - model={Model} promptType={PromptType} transcriptChars={Chars}", 
+            model, promptType, transcriptLength);
 
         var request = new
         {
@@ -81,15 +102,43 @@ public class AnthropicProvider : IAiProvider
         if (!response.IsSuccessStatusCode)
         {
             var preview = responseJson.Length > 200 ? responseJson[..200] : responseJson;
+            Log.Error("Anthropic: Summarization failed with {StatusCode}: {Error}", response.StatusCode, preview);
             throw new HttpRequestException($"Anthropic returned {(int)response.StatusCode}: {preview}");
         }
 
-        using var doc = JsonDocument.Parse(responseJson);
+        string result;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseJson);
 
-        return doc.RootElement
-            .GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
+            if (!doc.RootElement.TryGetProperty("content", out var contentArray) ||
+                contentArray.GetArrayLength() == 0)
+            {
+                Log.Error("Anthropic: Invalid response - no content in response");
+                throw new InvalidOperationException("Anthropic response has no content");
+            }
+
+            if (!contentArray[0].TryGetProperty("text", out var textElement))
+            {
+                Log.Error("Anthropic: Invalid response structure - missing text property");
+                throw new InvalidOperationException("Anthropic response missing text property");
+            }
+
+            result = textElement.GetString() ?? string.Empty;
+        }
+        catch (JsonException ex)
+        {
+            Log.Error(ex, "Anthropic: Failed to parse JSON response");
+            throw new InvalidOperationException("Anthropic returned invalid JSON", ex);
+        }
+        catch (Exception ex) when (ex is not HttpRequestException && ex is not InvalidOperationException)
+        {
+            Log.Error(ex, "Anthropic: Error parsing response");
+            throw;
+        }
+
+        Log.Information("Anthropic: Summarization completed - {Length} chars", result.Length);
+        return result;
     }
 
     public async IAsyncEnumerable<string> SummarizeStreamAsync(

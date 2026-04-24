@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -20,6 +21,8 @@ public partial class ProcessingJobViewModel : ViewModelBase
     public CancellationTokenSource Cts { get; } = new();
     public DateTime CreatedAt { get; } = DateTime.Now;
     private DateTime? _startedAt;
+    public int RetryCount { get; set; }
+    public int MaxRetries { get; set; } = 3;
 
     [ObservableProperty]
     private string _meetingTitle;
@@ -133,22 +136,22 @@ public partial class MainWindowViewModel : ViewModelBase
             var meetingVm = sender as MeetingItemViewModel;
             var title = meetingVm?.Title ?? meetingId;
 
-            if (action.StartsWith("pipeline:"))
-            {
-                var steps = action["pipeline:".Length..];
-                var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
-                var hasTranscript = !string.IsNullOrEmpty(meetingVm?.TranscriptText);
-                var hasSpeakers = hasTranscript && HasSpeakerLabels(meetingVm!.TranscriptText);
+             if (action.StartsWith("pipeline:"))
+             {
+                 var steps = action["pipeline:".Length..];
+                 var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
+                 var hasTranscript = !string.IsNullOrEmpty(meetingVm?.TranscriptText);
+                 var hasSpeakers = hasTranscript && HasSpeakerLabels(meetingVm!.TranscriptText);
 
-                // Skip transcribe if no audio or already transcribed
-                if (steps.Contains('t') && hasAudio && !hasTranscript)
-                    EnqueueManualJob(meetingId, title, "transcribe");
-                // Skip identify speakers if already done
-                if (steps.Contains('s') && !hasSpeakers)
-                    EnqueueManualJob(meetingId, title, "identify_speakers");
-                if (steps.Contains('m'))
-                    EnqueueManualJob(meetingId, title, "summarize");
-            }
+                 // Transcribe: skip only if no audio. Dialog will ask about overwrite if transcript exists
+                 if (steps.Contains('t') && hasAudio)
+                     EnqueueManualJob(meetingId, title, "transcribe");
+                 // Skip identify speakers if already done
+                 if (steps.Contains('s') && !hasSpeakers)
+                     EnqueueManualJob(meetingId, title, "identify_speakers");
+                 if (steps.Contains('m'))
+                     EnqueueManualJob(meetingId, title, "summarize");
+             }
             else
             {
                 EnqueueManualJob(meetingId, title, action);
@@ -261,48 +264,79 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task JobConsumerLoop()
-    {
-        while (true)
-        {
-            await _jobSignal.WaitAsync();
-            if (!_pendingJobs.TryDequeue(out var entry)) continue;
+     private async Task JobConsumerLoop()
+     {
+         while (true)
+         {
+             await _jobSignal.WaitAsync();
+             if (!_pendingJobs.TryDequeue(out var entry)) continue;
 
-            var (job, meetingId, action) = entry;
-            if (job.Cts.IsCancellationRequested)
-            {
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!job.IsComplete && !job.IsFailed)
-                    {
-                        job.IsActive = false;
-                        job.IsFailed = true;
-                        job.Status = "Cancelled";
-                    }
-                });
-                continue;
-            }
+             var (job, meetingId, action) = entry;
+             if (job.Cts.IsCancellationRequested)
+             {
+                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                 {
+                     if (!job.IsComplete && !job.IsFailed)
+                     {
+                         job.IsActive = false;
+                         job.IsFailed = true;
+                         job.Status = "Cancelled";
+                     }
+                 });
+                 continue;
+             }
 
-            try
-            {
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    job.IsActive = true;
-                    job.MarkStarted();
-                    var idx = JobQueue.IndexOf(job);
-                    if (idx > 0) JobQueue.Move(idx, 0);
-                    var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = true;
-                });
+             try
+             {
+                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                 {
+                     job.IsActive = true;
+                     job.MarkStarted();
+                     var idx = JobQueue.IndexOf(job);
+                     if (idx > 0) JobQueue.Move(idx, 0);
+                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
+                     if (vm != null) vm.IsBusy = true;
+                 });
 
-                SetStatus($"Processing: {job.MeetingTitle}");
+                 SetStatus($"Processing: {job.MeetingTitle}");
 
-                if (action == "transcribe")
-                    await RunManualTranscribeAsync(meetingId, job);
-                else if (action == "summarize")
-                    await RunManualSummarizeAsync(meetingId, job);
-                else if (action == "identify_speakers")
-                    await RunIdentifySpeakersAsync(meetingId, job);
+                 if (action == "transcribe")
+                 {
+                     // Check if transcript already exists and ask user
+                     var hasExisting = await HasExistingTranscriptAsync(meetingId);
+                     if (hasExisting)
+                     {
+                         // Must show dialog on UI thread
+                         var shouldOverwrite = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                             ShowTranscriptOverwriteDialogAsync());
+                         if (!shouldOverwrite)
+                         {
+                             // User chose to skip - mark as complete without processing
+                             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                             {
+                                 job.IsActive = false;
+                                 job.IsComplete = true;
+                                 job.Status = "Skipped";
+                                 job.Step = "Transcript already exists";
+                                 job.MarkFinished();
+                                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
+                                 if (vm != null)
+                                 {
+                                     vm.IsBusy = false;
+                                     vm.StatusMessage = "Transcription skipped - existing transcript retained";
+                                 }
+                             });
+                             ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} - transcription skipped (existing retained)");
+                             SetStatus("", false);
+                             continue;
+                         }
+                     }
+                     await RunManualTranscribeAsync(meetingId, job);
+                 }
+                 else if (action == "summarize")
+                     await RunManualSummarizeAsync(meetingId, job);
+                 else if (action == "identify_speakers")
+                     await RunIdentifySpeakersAsync(meetingId, job);
 
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -333,6 +367,30 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 Log.Error(ex, "Job failed for {MeetingId} action={Action}", meetingId, action);
+                
+                // Check if we should retry
+                var isRetryable = IsRetryableError(ex);
+                if (isRetryable && job.RetryCount < job.MaxRetries)
+                {
+                    job.RetryCount++;
+                    var delayMs = (int)Math.Pow(2, job.RetryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+                    Log.Warning("Job {MeetingId} failed, retry {RetryNum}/{MaxRetries} after {Delay}ms", 
+                        meetingId, job.RetryCount, job.MaxRetries, delayMs);
+                    
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        job.Status = $"Retry {job.RetryCount}/{job.MaxRetries}...";
+                        job.Step = $"Retrying in {delayMs/1000}s";
+                    });
+                    
+                    await Task.Delay(delayMs);
+                    
+                    // Re-enqueue the job
+                    _pendingJobs.Enqueue((job, meetingId, action));
+                    _jobSignal.Release();
+                    continue;
+                }
+                
                 // Friendly error for common cases
                 var errorMsg = ex.Message.Length > 150 ? ex.Message[..150] + "..." : ex.Message;
                 ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} failed: {errorMsg}");
@@ -357,63 +415,73 @@ public partial class MainWindowViewModel : ViewModelBase
 
     // --- Job Runners ---
 
-    private async Task RunManualTranscribeAsync(string meetingId, ProcessingJobViewModel job)
-    {
-        string? whisperModel = null;
-        string? audioPath = null;
-        string language = "en";
-        await using (var db = new AppDbContext())
-        {
-            var wmSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "whisper_model");
-            whisperModel = wmSetting?.Value;
-            var meeting = await db.Meetings.FindAsync(meetingId);
-            if (meeting == null) return;
-            audioPath = meeting.AudioPath;
-            language = meeting.Language;
-        }
+     private async Task RunManualTranscribeAsync(string meetingId, ProcessingJobViewModel job)
+     {
+         string? whisperModel = null;
+         string? audioPath = null;
+         string language = "en";
+         await using (var db = new AppDbContext())
+         {
+             var wmSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "whisper_model");
+             whisperModel = wmSetting?.Value;
+             var meeting = await db.Meetings.FindAsync(meetingId);
+             if (meeting == null) return;
+             audioPath = meeting.AudioPath;
+             language = meeting.Language;
+         }
 
-        if (string.IsNullOrEmpty(audioPath)) return;
+         if (string.IsNullOrEmpty(audioPath)) return;
 
-        var model = whisperModel ?? "tiny";
-        UpdateJob(job, "Transcribing...", $"Model: {model}");
+         var model = whisperModel ?? "tiny";
+         UpdateJob(job, "Transcribing...", $"Model: {model}");
 
-        var service = new Services.Transcription.WhisperTranscriptionService();
-        var result = await service.TranscribeAsync(audioPath, language, model, job.Cts.Token);
+         var service = new Services.Transcription.WhisperTranscriptionService();
+         var result = await service.TranscribeAsync(audioPath, language, model, job.Cts.Token);
 
-        await using var dbSave = new AppDbContext();
-        var transcript = new Transcript
-        {
-            MeetingId = meetingId,
-            Engine = result.Engine,
-            Model = result.Model,
-            Language = result.Language,
-            FullText = result.FullText,
-        };
-        foreach (var seg in result.Segments)
-        {
-            transcript.Segments.Add(new TranscriptSegment
-            {
-                TranscriptId = transcript.Id,
-                StartMs = seg.StartMs,
-                EndMs = seg.EndMs,
-                Text = seg.Text,
-                Confidence = seg.Confidence,
-            });
-        }
-        dbSave.Transcripts.Add(transcript);
-        await dbSave.SaveChangesAsync();
+         await using var dbSave = new AppDbContext();
+         
+         // Delete existing transcripts for this meeting to replace with new one
+         var existingTranscripts = await dbSave.Transcripts
+             .Where(t => t.MeetingId == meetingId)
+             .ToListAsync();
+         foreach (var existingTranscript in existingTranscripts)
+         {
+             dbSave.Transcripts.Remove(existingTranscript);
+         }
+         
+         var transcript = new Transcript
+         {
+             MeetingId = meetingId,
+             Engine = result.Engine,
+             Model = result.Model,
+             Language = result.Language,
+             FullText = result.FullText,
+         };
+         foreach (var seg in result.Segments)
+         {
+             transcript.Segments.Add(new TranscriptSegment
+             {
+                 TranscriptId = transcript.Id,
+                 StartMs = seg.StartMs,
+                 EndMs = seg.EndMs,
+                 Text = seg.Text,
+                 Confidence = seg.Confidence,
+             });
+         }
+         dbSave.Transcripts.Add(transcript);
+         await dbSave.SaveChangesAsync();
 
-        UpdateJob(job, "Transcribed", $"{result.Segments.Count} segments");
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-            if (vm != null)
-            {
-                vm.TranscriptText = result.FullText;
-                vm.StatusMessage = "Transcription complete";
-            }
-        });
-    }
+         UpdateJob(job, "Transcribed", $"{result.Segments.Count} segments");
+         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+         {
+             var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
+             if (vm != null)
+             {
+                 vm.TranscriptText = result.FullText;
+                 vm.StatusMessage = "Transcription complete";
+             }
+         });
+     }
 
     private async Task RunManualSummarizeAsync(string meetingId, ProcessingJobViewModel job)
     {
@@ -623,36 +691,194 @@ public partial class MainWindowViewModel : ViewModelBase
         });
     }
 
-    /// <summary>Detects if transcript already has speaker labels (e.g. "Speaker A:", "John:", "Manager:").</summary>
-    private static bool HasSpeakerLabels(string text)
-    {
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        int labelCount = 0;
-        foreach (var line in lines)
-        {
-            var colonIdx = line.IndexOf(':');
-            // Pattern: short label (1-30 chars) followed by colon, then text
-            if (colonIdx > 0 && colonIdx <= 30 && colonIdx < line.Length - 1)
-            {
-                var label = line[..colonIdx].Trim();
-                // Label should be words only (no timestamps, no URLs)
-                if (!string.IsNullOrEmpty(label) && !label.Contains("//") && !label.Contains('.'))
-                    labelCount++;
-            }
-            if (labelCount >= 3) return true; // 3+ labeled lines = speakers identified
-        }
-        return false;
-    }
+     /// <summary>Detects if transcript already has speaker labels (e.g. "Speaker A:", "John:", "Manager:").</summary>
+     private static bool HasSpeakerLabels(string text)
+     {
+         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+         int labelCount = 0;
+         foreach (var line in lines)
+         {
+             var colonIdx = line.IndexOf(':');
+             // Pattern: short label (1-30 chars) followed by colon, then text
+             if (colonIdx > 0 && colonIdx <= 30 && colonIdx < line.Length - 1)
+             {
+                 var label = line[..colonIdx].Trim();
+                 // Label should be words only (no timestamps, no URLs)
+                 if (!string.IsNullOrEmpty(label) && !label.Contains("//") && !label.Contains('.'))
+                     labelCount++;
+             }
+             if (labelCount >= 3) return true; // 3+ labeled lines = speakers identified
+         }
+         return false;
+     }
 
-    [RelayCommand]
-    private void NavigateTo(string view)
-    {
-        CurrentView = view switch
-        {
-            "recording" => Recording,
-            "meetings" => Meetings,
-            "settings" => Settings,
-            _ => Recording
-        };
-    }
+     /// <summary>Checks if a meeting already has a transcript in the database.</summary>
+     private static async Task<bool> HasExistingTranscriptAsync(string meetingId)
+     {
+         try
+         {
+             await using var db = new AppDbContext();
+             return await db.Transcripts
+                 .Where(t => t.MeetingId == meetingId)
+                 .AnyAsync();
+         }
+         catch (Exception ex)
+         {
+             Log.Error(ex, "Error checking for existing transcript for {MeetingId}", meetingId);
+             return false;
+         }
+     }
+
+     /// <summary>Shows a dialog asking user to overwrite or skip existing transcript.</summary>
+     private static async Task<bool> ShowTranscriptOverwriteDialogAsync()
+     {
+         if (Avalonia.Application.Current?.ApplicationLifetime
+             is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+             || desktop.MainWindow == null)
+             return true; // Default to overwrite if can't show dialog
+
+         var shouldOverwrite = false;
+         var dialog = new Avalonia.Controls.Window
+         {
+             Title = "Transcript Already Exists",
+             Width = 440,
+             SizeToContent = Avalonia.Controls.SizeToContent.Height,
+             WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
+             CanResize = false,
+             Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
+             ExtendClientAreaToDecorationsHint = false,
+         };
+
+         var root = new Avalonia.Controls.Border
+         {
+             Padding = new Avalonia.Thickness(28, 24),
+             Child = new Avalonia.Controls.StackPanel
+             {
+                 Spacing = 20,
+             }
+         };
+
+         var contentPanel = (Avalonia.Controls.StackPanel)root.Child;
+
+         // Message
+         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
+         {
+             Text = "This meeting already has a transcript.",
+             FontSize = 14,
+             Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
+             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+         });
+
+         // Detail
+         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
+         {
+             Text = "Would you like to overwrite it with a new transcription, or keep the existing one?",
+             FontSize = 12,
+             Foreground = Avalonia.Media.Brush.Parse("#7f849c"),
+             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+         });
+
+         // Buttons
+         var buttonPanel = new Avalonia.Controls.StackPanel
+         {
+             Orientation = Avalonia.Layout.Orientation.Horizontal,
+             Spacing = 10,
+             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+             Margin = new Avalonia.Thickness(0, 4, 0, 0),
+         };
+
+         var skipBtn = new Avalonia.Controls.Button
+         {
+             Content = "Keep Existing",
+             Background = Avalonia.Media.Brush.Parse("#313244"),
+             Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
+             Padding = new Avalonia.Thickness(24, 10),
+             CornerRadius = new Avalonia.CornerRadius(8),
+             FontSize = 13,
+         };
+         skipBtn.Click += (_, _) => { shouldOverwrite = false; dialog.Close(); };
+
+         var overwriteBtn = new Avalonia.Controls.Button
+         {
+             Content = "Overwrite",
+             Background = Avalonia.Media.Brush.Parse("#a6e3a1"),
+             Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
+             Padding = new Avalonia.Thickness(24, 10),
+             CornerRadius = new Avalonia.CornerRadius(8),
+             FontSize = 13,
+             FontWeight = Avalonia.Media.FontWeight.SemiBold,
+         };
+         overwriteBtn.Click += (_, _) => { shouldOverwrite = true; dialog.Close(); };
+
+         buttonPanel.Children.Add(skipBtn);
+         buttonPanel.Children.Add(overwriteBtn);
+         contentPanel.Children.Add(buttonPanel);
+
+         dialog.Content = root;
+         await dialog.ShowDialog(desktop.MainWindow);
+         return shouldOverwrite;
+     }
+
+     /// <summary>Determines if an error is transient and worth retrying.</summary>
+     private static bool IsRetryableError(Exception ex)
+     {
+         // Network-related errors are retryable
+         if (ex is HttpRequestException) return true;
+         
+         // Timeout errors are retryable
+         if (ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)) return true;
+         
+         // AI provider connection errors
+         if (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase)) return true;
+         if (ex.Message.Contains("unreachable", StringComparison.OrdinalIgnoreCase)) return true;
+         if (ex.Message.Contains("no route to host", StringComparison.OrdinalIgnoreCase)) return true;
+         
+         // Rate limiting
+         if (ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase)) return true;
+         if (ex.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)) return true;
+         
+         // Service unavailable
+         if (ex.Message.Contains("503", StringComparison.OrdinalIgnoreCase)) return true;
+         if (ex.Message.Contains("unavailable", StringComparison.OrdinalIgnoreCase)) return true;
+         
+         // Database locking (SQLite BusyError)
+         if (ex.Message.Contains("database is locked", StringComparison.OrdinalIgnoreCase)) return true;
+         if (ex.Message.Contains("locked", StringComparison.OrdinalIgnoreCase)) return true;
+         
+         // Check for Ollama specific errors
+         if (ex.Message.Contains("Ollama returned", StringComparison.OrdinalIgnoreCase))
+         {
+             // Don't retry on 404 (model not found) or 400 (bad request)
+             if (ex.Message.Contains("404") || ex.Message.Contains("400")) return false;
+             return true;
+         }
+         
+         // Check for OpenAI specific errors  
+         if (ex.Message.Contains("API returned", StringComparison.OrdinalIgnoreCase))
+         {
+             if (ex.Message.Contains("404") || ex.Message.Contains("400")) return false;
+             return true;
+         }
+         
+         // Check for Anthropic specific errors
+         if (ex.Message.Contains("Anthropic returned", StringComparison.OrdinalIgnoreCase))
+         {
+             if (ex.Message.Contains("404") || ex.Message.Contains("400")) return false;
+             return true;
+         }
+         
+         return false;
+     }
+
+     [RelayCommand]
+     private void NavigateTo(string view)
+     {
+         CurrentView = view switch
+         {
+             "recording" => Recording,
+             "meetings" => Meetings,
+             "settings" => Settings,
+             _ => Recording
+         };
+     }
 }

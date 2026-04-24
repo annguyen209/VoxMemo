@@ -27,21 +27,53 @@ public partial class App : Application
     public override async void OnFrameworkInitializationCompleted()
     {
         Log.Information("Initializing database");
-        await using (var db = new AppDbContext())
+        
+        var dbPath = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VoxMemo", "voxmemo.db");
+        
+        await using (var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}"))
         {
-            await db.Database.EnsureCreatedAsync();
-            try
+            await conn.OpenAsync();
+            
+            // Create tables if not exist
+            await using (var cmd = conn.CreateCommand())
             {
-                var dbPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "VoxMemo", "voxmemo.db");
-                await using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-                await conn.OpenAsync();
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = "ALTER TABLE Transcripts ADD COLUMN OriginalFullText TEXT";
+                cmd.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS Meetings (Id TEXT PRIMARY KEY, Title TEXT, Platform TEXT, StartedAt TEXT, EndedAt TEXT, AudioPath TEXT, DurationMs INTEGER, Language TEXT, CreatedAt TEXT);
+                    CREATE TABLE IF NOT EXISTS Transcripts (Id TEXT PRIMARY KEY, MeetingId TEXT, Engine TEXT, Model TEXT, Language TEXT, FullText TEXT, OriginalFullText TEXT, CreatedAt TEXT);
+                    CREATE TABLE IF NOT EXISTS TranscriptSegments (Id TEXT PRIMARY KEY, TranscriptId TEXT, StartMs INTEGER, EndMs INTEGER, Text TEXT, Confidence REAL);
+                    CREATE TABLE IF NOT EXISTS Summaries (Id TEXT PRIMARY KEY, MeetingId TEXT, Provider TEXT, Model TEXT, PromptType TEXT, Content TEXT, Language TEXT, CreatedAt TEXT);
+                    CREATE TABLE IF NOT EXISTS AppSettings (Key TEXT PRIMARY KEY, Value TEXT, EncryptedValue TEXT);
+                ";
                 await cmd.ExecuteNonQueryAsync();
             }
-            catch { }
+            
+            // Add OriginalFullText column if missing
+            await using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT name FROM pragma_table_info('Transcripts') WHERE name='OriginalFullText'";
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value)
+                {
+                    await using var cmd2 = conn.CreateCommand();
+                    cmd2.CommandText = "ALTER TABLE Transcripts ADD COLUMN OriginalFullText TEXT";
+                    await cmd2.ExecuteNonQueryAsync();
+                }
+            }
+            
+            // Add EncryptedValue column if missing
+            await using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT name FROM pragma_table_info('AppSettings') WHERE name='EncryptedValue'";
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value)
+                {
+                    await using var cmd2 = conn.CreateCommand();
+                    cmd2.CommandText = "ALTER TABLE AppSettings ADD COLUMN EncryptedValue TEXT";
+                    await cmd2.ExecuteNonQueryAsync();
+                }
+            }
         }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

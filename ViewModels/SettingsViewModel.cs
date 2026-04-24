@@ -229,9 +229,12 @@ public partial class SettingsViewModel : ViewModelBase
 
             SelectedAiProvider = await GetSettingAsync(db, "ai_provider", "Ollama");
             OllamaUrl = await GetSettingAsync(db, "ollama_url", "http://localhost:11434");
-            OpenAiApiKey = await GetSettingAsync(db, "openai_api_key", string.Empty);
+            
+            // Load and decrypt API keys
+            OpenAiApiKey = await GetApiKeyAsync(db, "openai_api_key");
             OpenAiBaseUrl = await GetSettingAsync(db, "openai_base_url", "https://api.openai.com/v1");
-            AnthropicApiKey = await GetSettingAsync(db, "anthropic_api_key", string.Empty);
+            AnthropicApiKey = await GetApiKeyAsync(db, "anthropic_api_key");
+            
             SelectedWhisperModel = await GetSettingAsync(db, "whisper_model", "base");
             AutoTranscribe = (await GetSettingAsync(db, "auto_transcribe", "true")) == "true";
             AutoSummarize = (await GetSettingAsync(db, "auto_summarize", "true")) == "true";
@@ -267,6 +270,36 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    private static async Task<string> GetApiKeyAsync(AppDbContext db, string key)
+    {
+        try
+        {
+            var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting == null)
+                return string.Empty;
+            
+            // Try to decrypt from EncryptedValue first (if column exists)
+            if (!string.IsNullOrEmpty(setting.EncryptedValue))
+            {
+                try
+                {
+                    var decrypted = Services.Security.SecureStorage.Decrypt(setting.EncryptedValue);
+                    if (!string.IsNullOrEmpty(decrypted))
+                        return decrypted;
+                }
+                catch { }
+            }
+            
+            // Fall back to plaintext value (for migration from older versions)
+            return setting.Value ?? string.Empty;
+        }
+        catch
+        {
+            // If query fails, return empty
+            return string.Empty;
+        }
+    }
+
     private async Task SaveSettingsAsync()
     {
         try
@@ -275,9 +308,12 @@ public partial class SettingsViewModel : ViewModelBase
 
             await SetSettingAsync(db, "ai_provider", SelectedAiProvider);
             await SetSettingAsync(db, "ollama_url", OllamaUrl);
-            await SetSettingAsync(db, "openai_api_key", OpenAiApiKey);
+            
+            // Save API keys securely (encrypted)
+            await SaveApiKeySecureAsync(db, "openai_api_key", OpenAiApiKey);
             await SetSettingAsync(db, "openai_base_url", OpenAiBaseUrl);
-            await SetSettingAsync(db, "anthropic_api_key", AnthropicApiKey);
+            await SaveApiKeySecureAsync(db, "anthropic_api_key", AnthropicApiKey);
+            
             await SetSettingAsync(db, "whisper_model", SelectedWhisperModel);
             await SetSettingAsync(db, "auto_transcribe", AutoTranscribe ? "true" : "false");
             await SetSettingAsync(db, "auto_summarize", AutoSummarize ? "true" : "false");
@@ -293,6 +329,52 @@ public partial class SettingsViewModel : ViewModelBase
             await db.SaveChangesAsync();
         }
         catch { }
+    }
+
+    private static readonly string[] SensitiveKeys = { "openai_api_key", "anthropic_api_key", "ollama_api_key" };
+
+    private static async Task SaveApiKeySecureAsync(AppDbContext db, string key, string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            try
+            {
+                var existing = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+                if (existing != null)
+                {
+                    existing.Value = "";
+                    existing.EncryptedValue = "";
+                }
+            }
+            catch { }
+            return;
+        }
+
+        try
+        {
+            var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting == null)
+            {
+                setting = new AppSettings { Key = key };
+                db.AppSettings.Add(setting);
+            }
+            
+            // Encrypt the API key
+            var encrypted = Services.Security.SecureStorage.Encrypt(value);
+            setting.EncryptedValue = encrypted;
+            setting.Value = ""; // Don't store plaintext
+        }
+        catch
+        {
+            // Fallback to plaintext if encryption fails
+            var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting == null)
+            {
+                setting = new AppSettings { Key = key };
+                db.AppSettings.Add(setting);
+            }
+            setting.Value = value;
+        }
     }
 
     private static async Task<string> GetSettingAsync(AppDbContext db, string key, string defaultValue)
