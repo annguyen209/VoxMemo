@@ -33,6 +33,9 @@ public partial class RecordingView : UserControl
             _ => "Records from your microphone (your voice only)"
         });
 
+    public static readonly IValueConverter RecordSubTextConverter =
+        new FuncValueConverter<bool, string>(isRecording => isRecording ? "Click to stop" : "Click to start");
+
     public RecordingView()
     {
         InitializeComponent();

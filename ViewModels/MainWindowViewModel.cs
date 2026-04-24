@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
@@ -870,15 +871,52 @@ public partial class MainWindowViewModel : ViewModelBase
          return false;
      }
 
-     [RelayCommand]
-     private void NavigateTo(string view)
-     {
-         CurrentView = view switch
-         {
-             "recording" => Recording,
-             "meetings" => Meetings,
-             "settings" => Settings,
-             _ => Recording
-         };
-     }
+[RelayCommand]
+    private void NavigateTo(string view)
+    {
+        CurrentView = view switch
+        {
+            "recording" => Recording,
+            "meetings" => Meetings,
+            "settings" => Settings,
+            _ => Recording
+        };
+    }
+
+    [RelayCommand]
+    private void QuitApp()
+    {
+        Log.Information("VoxMemo quitting via Quit button");
+        
+        // Suppress the tray notification on close
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            if (desktop.MainWindow is Views.MainWindow mainWindow)
+            {
+                mainWindow.PrepareForExit();
+            }
+        }
+        
+        // Hide tray icon before quitting
+        try
+        {
+            if (Avalonia.Application.Current != null)
+            {
+                var trayIcons = Avalonia.Controls.TrayIcon.GetIcons(Avalonia.Application.Current);
+                if (trayIcons != null)
+                {
+                    foreach (var tray in trayIcons)
+                    {
+                        tray.IsVisible = false;
+                    }
+                }
+            }
+        }
+        catch { }
+        
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop2)
+        {
+            desktop2.Shutdown();
+        }
+    }
 }

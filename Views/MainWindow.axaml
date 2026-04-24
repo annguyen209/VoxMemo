@@ -30,6 +30,17 @@
                                FontSize="12" Foreground="#6c7086" Margin="0,4,0,0"/>
                 </StackPanel>
 
+                <!-- Quit Button at Bottom -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="16,16,16,16">
+                    <Button Command="{Binding QuitAppCommand}"
+                            HorizontalAlignment="Stretch"
+                            Padding="16,10"
+                            Background="#313244" Foreground="#f38ba8"
+                            CornerRadius="8" FontSize="13">
+                        <TextBlock Text="Quit" FontWeight="SemiBold"/>
+                    </Button>
+                </StackPanel>
+
                 <!-- Navigation -->
                 <ListBox SelectedIndex="{Binding SelectedNavIndex}"
                          Background="Transparent"

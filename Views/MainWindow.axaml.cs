@@ -6,6 +6,7 @@ namespace VoxMemo.Views;
 public partial class MainWindow : Window
 {
     private bool _allowClose;
+    private bool _suppressTrayNotification;
 
     public MainWindow()
     {
@@ -16,6 +17,7 @@ public partial class MainWindow : Window
     public void PrepareForExit()
     {
         _allowClose = true;
+        _suppressTrayNotification = true;
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
@@ -26,6 +28,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         Hide();
 
-        MainWindowViewModel.ShowTrayNotification("VoxMemo", "VoxMemo is still running in the system tray.");
+        if (!_suppressTrayNotification)
+            MainWindowViewModel.ShowTrayNotification("VoxMemo", "VoxMemo is still running in the system tray.");
     }
 }
