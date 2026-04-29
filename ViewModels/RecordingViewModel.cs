@@ -109,6 +109,10 @@ public partial class RecordingViewModel : ViewModelBase
         {
             Dispatcher.UIThread.Post(() => StatusMessage = $"Recording error: {err}");
         };
+        _recorder.RecordingStatus += (_, msg) =>
+        {
+            Dispatcher.UIThread.Post(() => StatusMessage = msg);
+        };
         RefreshDeviceList();
 
         SettingsViewModel.EnabledLanguagesChanged += (_, codes) =>

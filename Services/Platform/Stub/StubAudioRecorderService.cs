@@ -10,6 +10,7 @@ public class StubAudioRecorderService : IAudioRecorder
 {
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
+    public event EventHandler<string>? RecordingStatus;
 
     public bool IsRecording => false;
     public bool IsPaused => false;

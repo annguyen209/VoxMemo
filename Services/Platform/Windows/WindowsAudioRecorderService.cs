@@ -39,8 +39,11 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
     private WaveFormat? _bufferFormat;
     private const int MaxBufferSeconds = 10;
 
+    private bool _writeErrorReported;
+
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
+    public event EventHandler<string>? RecordingStatus;
 
     public bool IsRecording => (_capture != null || _sysCapture != null) && _stopwatch.IsRunning;
     public bool IsPaused => _isPaused;
@@ -102,6 +105,9 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
                 _bufferFormat = sysFormat;
                 lock (_bufferLock) _recentBuffer.Clear();
 
+                WarnIfLargeFormat(_micCapture.WaveFormat);
+                WarnIfLargeFormat(_sysCapture.WaveFormat);
+
                 _micCapture.DataAvailable += OnMicDataAvailable;
                 _sysCapture.DataAvailable += OnSysDataAvailable;
 
@@ -136,6 +142,7 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
 
                 _captureFormat = _capture.WaveFormat;
                 _bufferFormat = _captureFormat;
+                WarnIfLargeFormat(_captureFormat);
                 Log.Information("Recording started: {Source} device={DeviceId} format={Format} output={Path}",
                     sourceType, deviceId, _captureFormat, outputPath);
                 _writer = new WaveFileWriter(outputPath, _captureFormat);
@@ -151,6 +158,7 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             }
 
             _stopwatch.Restart();
+            _writeErrorReported = false;
             _isPaused = false;
         }
         catch (Exception ex)
@@ -171,14 +179,30 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             UpdateBuffer(e.Buffer, e.BytesRecorded);
             UpdateAudioLevel(e.Buffer, e.BytesRecorded, _captureFormat);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            if (!_writeErrorReported)
+            {
+                _writeErrorReported = true;
+                Log.Error(ex, "Audio write failed during recording");
+                RecordingError?.Invoke(this, $"Audio write failed: {ex.Message}");
+            }
+        }
     }
 
     private void OnMicDataAvailable(object? sender, WaveInEventArgs e)
     {
         if (_isPaused || _micWriter == null || e.BytesRecorded == 0) return;
         try { _micWriter.Write(e.Buffer, 0, e.BytesRecorded); }
-        catch { }
+        catch (Exception ex)
+        {
+            if (!_writeErrorReported)
+            {
+                _writeErrorReported = true;
+                Log.Error(ex, "Mic audio write failed");
+                RecordingError?.Invoke(this, $"Mic write failed: {ex.Message}");
+            }
+        }
     }
 
     private void OnSysDataAvailable(object? sender, WaveInEventArgs e)
@@ -190,7 +214,15 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             UpdateBuffer(e.Buffer, e.BytesRecorded);
             UpdateAudioLevel(e.Buffer, e.BytesRecorded, _bufferFormat);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            if (!_writeErrorReported)
+            {
+                _writeErrorReported = true;
+                Log.Error(ex, "System audio write failed");
+                RecordingError?.Invoke(this, $"System audio write failed: {ex.Message}");
+            }
+        }
     }
 
     private void UpdateBuffer(byte[] buffer, int bytesRecorded)
@@ -228,6 +260,19 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             }
         }
         AudioLevelChanged?.Invoke(this, Math.Min(max, 1.0f));
+    }
+
+    private void WarnIfLargeFormat(WaveFormat fmt)
+    {
+        const long maxSafeBytes = (long)(3.8 * 1024 * 1024 * 1024);
+        long bytesPerHour = (long)fmt.AverageBytesPerSecond * 3600;
+        if (bytesPerHour > maxSafeBytes)
+        {
+            var safeDuration = TimeSpan.FromSeconds(maxSafeBytes / (double)fmt.AverageBytesPerSecond);
+            Log.Warning("Audio format {Format} will hit 4 GB WAV limit after {Safe:hh\\:mm}. " +
+                        "Recordings longer than {Safe:hh\\:mm} may be truncated.",
+                        fmt, safeDuration);
+        }
     }
 
     public string? LastSnapshotError { get; private set; }
@@ -340,12 +385,30 @@ public class WindowsAudioRecorderService : IAudioRecorder, IDisposable
             // Mix mic + system audio into final output
             if (_mixFinalPath != null && _micTempPath != null && _sysTempPath != null)
             {
-                await Task.Run(() =>
+                RecordingStatus?.Invoke(this, "Mixing audio tracks (may take a minute for long recordings)...");
+                var micTempLocal = _micTempPath;
+                var sysTempLocal = _sysTempPath;
+                var mixFinalLocal = _mixFinalPath;
+                var mixOk = await Task.Run(() =>
                     WindowsRecordingRecoveryService.TryCreateMixedRecording(
-                        _micTempPath,
-                        _sysTempPath,
-                        _mixFinalPath,
+                        micTempLocal, sysTempLocal, mixFinalLocal,
                         cleanupInputsOnSuccess: true));
+
+                if (!mixOk)
+                {
+                    Log.Warning("Mix failed for {Output} — falling back to single source", mixFinalLocal);
+                    var sysSizeBytes = File.Exists(sysTempLocal) ? new FileInfo(sysTempLocal).Length : 0;
+                    var micSizeBytes = File.Exists(micTempLocal) ? new FileInfo(micTempLocal).Length : 0;
+                    var bestPath = sysSizeBytes >= micSizeBytes ? sysTempLocal : micTempLocal;
+                    if (File.Exists(bestPath))
+                    {
+                        File.Move(bestPath, mixFinalLocal, overwrite: true);
+                        RecordingError?.Invoke(this,
+                            "Mix failed — saved single audio track only. Check logs for details.");
+                    }
+                    try { if (File.Exists(sysTempLocal)) File.Delete(sysTempLocal); } catch { }
+                    try { if (File.Exists(micTempLocal)) File.Delete(micTempLocal); } catch { }
+                }
             }
 
             _mixFinalPath = null;

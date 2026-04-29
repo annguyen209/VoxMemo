@@ -18,6 +18,9 @@ public interface IAudioRecorder
     event EventHandler<float>? AudioLevelChanged;
     event EventHandler<string>? RecordingError;
 
+    /// <summary>Raised to report progress during long operations (mixing, converting).</summary>
+    event EventHandler<string>? RecordingStatus;
+
     List<AudioDevice> GetInputDevices();
     List<AudioDevice> GetLoopbackDevices();
     Task StartRecordingAsync(string outputPath, AudioSourceType sourceType, string? deviceId = null);
