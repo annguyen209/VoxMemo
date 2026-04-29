@@ -285,7 +285,7 @@ public partial class App : Application
         string hotkey = "Ctrl+Shift+R";
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var setting = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
                 .FirstOrDefaultAsync(db.AppSettings, s => s.Key == "recording_hotkey");
             if (setting != null && !string.IsNullOrEmpty(setting.Value))

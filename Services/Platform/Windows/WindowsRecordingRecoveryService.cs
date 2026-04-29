@@ -222,7 +222,7 @@ public static class WindowsRecordingRecoveryService
     {
         try
         {
-            using var db = new AppDbContext();
+            using var db = AppDbContextFactory.Create();
             db.Database.EnsureCreated();
             var storagePath = db.AppSettings
                 .AsNoTracking()

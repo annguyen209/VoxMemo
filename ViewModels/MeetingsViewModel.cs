@@ -72,7 +72,7 @@ public partial class MeetingsViewModel : ViewModelBase
         IsLoading = true;
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             await db.Database.EnsureCreatedAsync();
 
             var meetings = await db.Meetings
@@ -211,7 +211,7 @@ public partial class MeetingsViewModel : ViewModelBase
         // Read default language
         try
         {
-            await using var db2 = new AppDbContext();
+            await using var db2 = AppDbContextFactory.Create();
             var langSetting = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "default_language");
             if (langSetting != null) language = langSetting.Value;
         }
@@ -221,7 +221,7 @@ public partial class MeetingsViewModel : ViewModelBase
         List<string> languages = ["en", "vi"];
         try
         {
-            await using var db3 = new AppDbContext();
+            await using var db3 = AppDbContextFactory.Create();
             var langListSetting = await db3.AppSettings.FirstOrDefaultAsync(s => s.Key == "enabled_languages");
             if (langListSetting != null && !string.IsNullOrEmpty(langListSetting.Value))
                 languages = langListSetting.Value.Split(',').ToList();
@@ -395,7 +395,7 @@ public partial class MeetingsViewModel : ViewModelBase
             Language = language,
         };
 
-        await using var dbSave = new AppDbContext();
+        await using var dbSave = AppDbContextFactory.Create();
         dbSave.Meetings.Add(meeting);
 
         dbSave.Transcripts.Add(new Transcript
@@ -443,7 +443,7 @@ public partial class MeetingsViewModel : ViewModelBase
         string storagePath;
         try
         {
-            await using var settingsDb = new AppDbContext();
+            await using var settingsDb = AppDbContextFactory.Create();
             var setting = await settingsDb.AppSettings.FirstOrDefaultAsync(s => s.Key == "storage_path");
             storagePath = setting?.Value ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VoxMemo");
@@ -493,7 +493,7 @@ public partial class MeetingsViewModel : ViewModelBase
         string language = "en";
         try
         {
-            await using var db2 = new AppDbContext();
+            await using var db2 = AppDbContextFactory.Create();
             var langSetting = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "default_language");
             if (langSetting != null) language = langSetting.Value;
         }
@@ -511,7 +511,7 @@ public partial class MeetingsViewModel : ViewModelBase
             Language = language,
         };
 
-        await using var dbSave = new AppDbContext();
+        await using var dbSave = AppDbContextFactory.Create();
         dbSave.Meetings.Add(meeting);
         await dbSave.SaveChangesAsync();
 
@@ -536,7 +536,7 @@ public partial class MeetingsViewModel : ViewModelBase
         // Cancel and remove any jobs for this meeting
         MeetingItemViewModel.RaiseMeetingDeleted(meeting.Id);
 
-        await using var db = new AppDbContext();
+        await using var db = AppDbContextFactory.Create();
         var entity = await db.Meetings.FindAsync(meeting.Id);
         if (entity != null)
         {
@@ -576,7 +576,7 @@ public partial class MeetingItemViewModel : ViewModelBase
     {
         try
         {
-            using var db = new AppDbContext();
+            using var db = AppDbContextFactory.Create();
             var setting = db.AppSettings.FirstOrDefault(s => s.Key == "enabled_languages");
             if (setting != null && !string.IsNullOrEmpty(setting.Value))
                 return setting.Value.Split(',').ToList();
@@ -695,7 +695,7 @@ public partial class MeetingItemViewModel : ViewModelBase
     {
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var meeting = await db.Meetings.FindAsync(Id);
             if (meeting != null)
             {
@@ -725,7 +725,7 @@ public partial class MeetingItemViewModel : ViewModelBase
 
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var transcript = await db.Transcripts
                 .Where(t => t.MeetingId == Id)
                 .OrderByDescending(t => t.CreatedAt)
@@ -1045,7 +1045,7 @@ public partial class MeetingItemViewModel : ViewModelBase
         string savedSteps = "tsm"; // default all
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var skipSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
             var stepsSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
             skipDialog = skipSetting?.Value == "true";
@@ -1209,7 +1209,7 @@ public partial class MeetingItemViewModel : ViewModelBase
         {
             try
             {
-                await using var db = new AppDbContext();
+                await using var db = AppDbContextFactory.Create();
                 var skipSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
                 if (skipSetting != null) skipSetting.Value = "true";
                 else db.AppSettings.Add(new Models.AppSettings { Key = "smart_process_skip_dialog", Value = "true" });

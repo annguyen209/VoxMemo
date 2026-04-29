@@ -421,7 +421,7 @@ public partial class MainWindowViewModel : ViewModelBase
          string? whisperModel = null;
          string? audioPath = null;
          string language = "en";
-         await using (var db = new AppDbContext())
+         await using (var db = AppDbContextFactory.Create())
          {
              var wmSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "whisper_model");
              whisperModel = wmSetting?.Value;
@@ -439,7 +439,7 @@ public partial class MainWindowViewModel : ViewModelBase
          var service = new Services.Transcription.WhisperTranscriptionService();
          var result = await service.TranscribeAsync(audioPath, language, model, job.Cts.Token);
 
-         await using var dbSave = new AppDbContext();
+         await using var dbSave = AppDbContextFactory.Create();
          
          // Delete existing transcripts for this meeting to replace with new one
          var existingTranscripts = await dbSave.Transcripts
@@ -490,7 +490,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         string? transcriptText;
         string language = "en";
-        await using (var db = new AppDbContext())
+        await using (var db = AppDbContextFactory.Create())
         {
             var meeting = await db.Meetings.FindAsync(meetingId);
             if (meeting != null) language = meeting.Language;
@@ -525,7 +525,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (!string.IsNullOrWhiteSpace(summary))
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             db.Summaries.Add(new Summary
             {
                 MeetingId = meetingId,
@@ -556,7 +556,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         string? transcriptText;
         string language = "en";
-        await using (var db = new AppDbContext())
+        await using (var db = AppDbContextFactory.Create())
         {
             var meeting = await db.Meetings.FindAsync(meetingId);
             if (meeting != null) language = meeting.Language;
@@ -592,7 +592,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (!string.IsNullOrWhiteSpace(result))
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var transcript = await db.Transcripts
                 .Where(t => t.MeetingId == meetingId)
                 .OrderByDescending(t => t.CreatedAt)
@@ -635,7 +635,7 @@ public partial class MainWindowViewModel : ViewModelBase
             string smartSteps = "tsm";
             try
             {
-                await using var db = new AppDbContext();
+                await using var db = AppDbContextFactory.Create();
                 var atSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "auto_transcribe");
                 var asSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "auto_summarize");
                 var stepsSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
@@ -718,7 +718,7 @@ public partial class MainWindowViewModel : ViewModelBase
      {
          try
          {
-             await using var db = new AppDbContext();
+             await using var db = AppDbContextFactory.Create();
              return await db.Transcripts
                  .Where(t => t.MeetingId == meetingId)
                  .AnyAsync();

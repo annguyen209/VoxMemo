@@ -149,7 +149,7 @@ public partial class RecordingViewModel : ViewModelBase
     {
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "storage_path");
             if (setting != null && !string.IsNullOrWhiteSpace(setting.Value))
                 return setting.Value;
@@ -400,7 +400,7 @@ public partial class RecordingViewModel : ViewModelBase
                 Language = SelectedLanguage,
             };
 
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             db.Meetings.Add(meeting);
             await db.SaveChangesAsync();
 

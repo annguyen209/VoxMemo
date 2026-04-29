@@ -225,7 +225,7 @@ public partial class SettingsViewModel : ViewModelBase
         _isLoading = true;
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
 
             SelectedAiProvider = await GetSettingAsync(db, "ai_provider", "Ollama");
             OllamaUrl = await GetSettingAsync(db, "ollama_url", "http://localhost:11434");
@@ -304,7 +304,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
 
             await SetSettingAsync(db, "ai_provider", SelectedAiProvider);
             await SetSettingAsync(db, "ollama_url", OllamaUrl);
