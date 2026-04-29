@@ -183,7 +183,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _ => Recording
         };
 
-        if (value == 1)
+        if (value == 1 && Meetings.SelectedMeeting?.Playback.IsPlaybackActive != true)
         {
             _ = Meetings.LoadMeetingsCommand.ExecuteAsync(null);
         }
