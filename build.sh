@@ -5,20 +5,16 @@ echo "=== VoxMemo Cross-Platform Build ==="
 
 PUBLISH_DIR="publish"
 VERSION="1.4.0"
+ISCC="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
 
 # Clean
 rm -rf "$PUBLISH_DIR"
 
-# Build targets
-declare -A TARGETS=(
-    ["win-x64"]="VoxMemo-v${VERSION}-win-x64"
-    ["linux-x64"]="VoxMemo-v${VERSION}-linux-x64"
-    ["osx-x64"]="VoxMemo-v${VERSION}-osx-x64"
-    ["osx-arm64"]="VoxMemo-v${VERSION}-osx-arm64"
-)
+# Fixed platform order
+RIDS=("win-x64" "linux-x64" "osx-x64" "osx-arm64")
 
-for RID in "${!TARGETS[@]}"; do
-    NAME="${TARGETS[$RID]}"
+for RID in "${RIDS[@]}"; do
+    NAME="VoxMemo-v${VERSION}-${RID}"
     echo ""
     echo "--- Building $RID ---"
 
@@ -28,24 +24,27 @@ for RID in "${!TARGETS[@]}"; do
         -o "$PUBLISH_DIR/$RID"
 
     echo "--- Packaging $NAME ---"
-    cd "$PUBLISH_DIR"
 
     if [[ "$RID" == win-* ]]; then
-        # Zip for Windows
-        if command -v zip &> /dev/null; then
-            cd "$RID" && zip -r "../${NAME}.zip" . && cd ..
-        elif command -v powershell &> /dev/null; then
-            powershell -Command "Compress-Archive -Path '${RID}/*' -DestinationPath '${NAME}.zip' -Force"
-        fi
+        pwsh -NoProfile -Command \
+            "Compress-Archive -Path '${PUBLISH_DIR}/${RID}/*' -DestinationPath '${PUBLISH_DIR}/${NAME}.zip' -Force"
     else
-        # Tar.gz for Linux/macOS
-        tar czf "${NAME}.tar.gz" -C "$RID" .
+        tar czf "${PUBLISH_DIR}/${NAME}.tar.gz" -C "${PUBLISH_DIR}/${RID}" .
     fi
 
-    cd ..
     echo "--- $RID done ---"
 done
 
+# Windows installer via Inno Setup
+if [[ -f "$ISCC" ]]; then
+    echo ""
+    echo "--- Building Windows installer ---"
+    "$ISCC" setup.iss
+else
+    echo ""
+    echo "--- Inno Setup not found, skipping installer ---"
+fi
+
 echo ""
 echo "=== Build complete ==="
-ls -lh "$PUBLISH_DIR"/*.{zip,tar.gz} 2>/dev/null || true
+ls -lh "$PUBLISH_DIR"/*.{zip,tar.gz,exe} 2>/dev/null || true
