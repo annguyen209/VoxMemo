@@ -110,6 +110,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _customSpeakerPrompt = string.Empty;
 
+    [ObservableProperty]
+    private string _selectedTheme = "dark";
+
     // Prompt templates
     public ObservableCollection<PromptTemplate> SummaryTemplates { get; } =
     [
@@ -213,6 +216,14 @@ public partial class SettingsViewModel : ViewModelBase
     }
     partial void OnDefaultLanguageChanged(string value) => SaveIfNotLoading();
     partial void OnStoragePathChanged(string value) => SaveIfNotLoading();
+    partial void OnSelectedThemeChanged(string value)
+    {
+        if (!_isLoading)
+        {
+            _ = SaveSettingDirectAsync("ui_theme", value);
+            (Avalonia.Application.Current as App)?.SetTheme(value);
+        }
+    }
 
     private void SaveIfNotLoading()
     {
@@ -252,6 +263,7 @@ public partial class SettingsViewModel : ViewModelBase
             DefaultLanguage = await GetSettingAsync(db, "default_language", "en");
             StoragePath = await GetSettingAsync(db, "storage_path",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VoxMemo"));
+            SelectedTheme = await GetSettingAsync(db, "ui_theme", "dark");
 
             var whisperService = new WhisperTranscriptionService();
             var models = await whisperService.GetAvailableModelsAsync();
@@ -325,6 +337,7 @@ public partial class SettingsViewModel : ViewModelBase
             await SetSettingAsync(db, "enabled_languages", string.Join(",", EnabledLanguages.Select(l => l.Code)));
             await SetSettingAsync(db, "default_language", DefaultLanguage);
             await SetSettingAsync(db, "storage_path", StoragePath);
+            await SetSettingAsync(db, "ui_theme", SelectedTheme);
 
             await db.SaveChangesAsync();
         }

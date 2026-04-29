@@ -23,6 +23,37 @@ public partial class SettingsView : UserControl
         InitializeComponent();
     }
 
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
+        {
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(vm.SelectedTheme))
+                {
+                    DarkRadio.IsChecked = vm.SelectedTheme == "dark";
+                    LightRadio.IsChecked = vm.SelectedTheme == "light";
+                }
+            };
+            // Set initial state
+            DarkRadio.IsChecked = vm.SelectedTheme == "dark";
+            LightRadio.IsChecked = vm.SelectedTheme == "light";
+        }
+    }
+
+    private void OnDarkThemeChecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
+            vm.SelectedTheme = "dark";
+    }
+
+    private void OnLightThemeChecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
+            vm.SelectedTheme = "light";
+    }
+
     private async void OnBrowseStoragePath(object? sender, RoutedEventArgs e)
     {
         var topLevel = TopLevel.GetTopLevel(this);
