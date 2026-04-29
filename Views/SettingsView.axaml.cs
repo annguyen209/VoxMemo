@@ -23,22 +23,35 @@ public partial class SettingsView : UserControl
         InitializeComponent();
     }
 
-    protected override void OnDataContextChanged(EventArgs e)
+    private VoxMemo.ViewModels.SettingsViewModel? _previousSettingsVm;
+
+    private void OnSettingsVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        base.OnDataContextChanged(e);
-        if (DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
+        if (args.PropertyName == nameof(VoxMemo.ViewModels.SettingsViewModel.SelectedTheme) &&
+            DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
         {
-            vm.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName == nameof(vm.SelectedTheme))
-                {
-                    DarkRadio.IsChecked = vm.SelectedTheme == "dark";
-                    LightRadio.IsChecked = vm.SelectedTheme == "light";
-                }
-            };
-            // Set initial state
             DarkRadio.IsChecked = vm.SelectedTheme == "dark";
             LightRadio.IsChecked = vm.SelectedTheme == "light";
+        }
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        if (_previousSettingsVm != null)
+            _previousSettingsVm.PropertyChanged -= OnSettingsVmPropertyChanged;
+
+        base.OnDataContextChanged(e);
+
+        if (DataContext is VoxMemo.ViewModels.SettingsViewModel vm)
+        {
+            _previousSettingsVm = vm;
+            vm.PropertyChanged += OnSettingsVmPropertyChanged;
+            DarkRadio.IsChecked = vm.SelectedTheme == "dark";
+            LightRadio.IsChecked = vm.SelectedTheme == "light";
+        }
+        else
+        {
+            _previousSettingsVm = null;
         }
     }
 
