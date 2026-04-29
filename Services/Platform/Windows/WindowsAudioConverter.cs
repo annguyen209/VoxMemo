@@ -8,12 +8,20 @@ public class WindowsAudioConverter : IAudioConverter
 {
     public void ConvertToWhisperFormat(string inputPath, string outputPath)
     {
-        var targetFormat = new WaveFormat(16000, 16, 1);
-
         using var reader = new AudioFileReader(inputPath);
-        using var resampler = new MediaFoundationResampler(reader, targetFormat);
-        resampler.ResamplerQuality = 60;
-        WaveFileWriter.CreateWaveFile(outputPath, resampler);
+
+        // Resample to 16 kHz if needed
+        ISampleProvider resampled = reader.WaveFormat.SampleRate != 16000
+            ? (ISampleProvider)new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(reader, 16000)
+            : reader;
+
+        // Downmix to mono if needed
+        ISampleProvider mono = resampled.WaveFormat.Channels != 1
+            ? new NAudio.Wave.SampleProviders.StereoToMonoSampleProvider(resampled)
+            : resampled;
+
+        // Write as 16-bit PCM
+        WaveFileWriter.CreateWaveFile16(outputPath, mono);
     }
 
     public void ConvertInPlace(string wavPath)
