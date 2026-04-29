@@ -28,8 +28,8 @@ public static class AiProviderFactory
 
         try
         {
-            await using var db = new AppDbContext();
-            
+            await using var db = AppDbContextFactory.Create();
+
             // Load provider name
             var providerSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "ai_provider");
             providerName = providerSetting?.Value ?? "Ollama";
@@ -87,7 +87,7 @@ public static class AiProviderFactory
         string? modelId = null;
         try
         {
-            await using var db2 = new AppDbContext();
+            await using var db2 = AppDbContextFactory.Create();
             modelId = (await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "ai_model"))?.Value;
         }
         catch (Exception ex)
@@ -164,7 +164,7 @@ public static class AiProviderFactory
         try
         {
             var encrypted = SecureStorage.Encrypt(apiKey);
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var setting = await db.AppSettings.FindAsync(keyName);
             if (setting == null)
             {

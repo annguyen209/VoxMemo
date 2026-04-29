@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="VoxMemo.Views.Dialogs.SmartProcessDialog"
+        Title="Smart Process" Width="420"
+        SizeToContent="Height" WindowStartupLocation="CenterOwner"
+        CanResize="False" Background="#1e1e2e">
+    <StackPanel Margin="28,24" Spacing="16">
+        <TextBlock Text="Select processing steps:" FontSize="14" Foreground="#cdd6f4"/>
+        <CheckBox x:Name="ChkTranscribe" Foreground="#cdd6f4">
+            <StackPanel Spacing="2">
+                <TextBlock Text="1. Transcribe audio" FontSize="13"
+                           Foreground="#89b4fa" FontWeight="SemiBold"/>
+                <TextBlock Text="Convert audio to text using Whisper"
+                           FontSize="11" Foreground="#bac2de"/>
+            </StackPanel>
+        </CheckBox>
+        <CheckBox x:Name="ChkSpeakers" Foreground="#cdd6f4">
+            <StackPanel Spacing="2">
+                <TextBlock Text="2. Identify speakers" FontSize="13"
+                           Foreground="#f9e2af" FontWeight="SemiBold"/>
+                <TextBlock Text="AI reformats transcript as dialog with speaker labels"
+                           FontSize="11" Foreground="#bac2de"/>
+            </StackPanel>
+        </CheckBox>
+        <CheckBox x:Name="ChkSummarize" Foreground="#cdd6f4">
+            <StackPanel Spacing="2">
+                <TextBlock Text="3. Summarize with AI" FontSize="13"
+                           Foreground="#a6e3a1" FontWeight="SemiBold"/>
+                <TextBlock Text="Generate a meeting summary from the transcript"
+                           FontSize="11" Foreground="#bac2de"/>
+            </StackPanel>
+        </CheckBox>
+        <Border Height="1" Background="#313244"/>
+        <CheckBox x:Name="ChkDontAsk" Foreground="#7f849c">
+            <TextBlock Text="Don't ask again (reset in Settings)" FontSize="12"/>
+        </CheckBox>
+        <StackPanel Orientation="Horizontal" Spacing="10"
+                    HorizontalAlignment="Right" Margin="0,4,0,0">
+            <Button Content="Cancel" Click="OnCancel"
+                    Background="#313244" Foreground="#cdd6f4"
+                    Padding="24,10" CornerRadius="8" FontSize="13"/>
+            <Button Content="Start Processing" Click="OnStart"
+                    Background="#cba6f7" Foreground="#1e1e2e"
+                    Padding="24,10" CornerRadius="8" FontSize="13" FontWeight="SemiBold"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

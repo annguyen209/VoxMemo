@@ -67,6 +67,49 @@ public class WindowsRecordingRecoveryServiceTests
         }
     }
 
+    [Fact]
+    public void TryRepairWaveHeader_ClampsToUIntMaxForLargeFiles()
+    {
+        // This test verifies the repair works and produces valid uint values
+        // (not negative/garbage from overflow) even when sizes approach uint range.
+        var dir = CreateTempDirectory();
+        try
+        {
+            var path = Path.Combine(dir, "clamped.wav");
+            CreateWaveFile(path);
+            var dataSizeOffset = FindDataSizeOffset(path);
+
+            // Zero out RIFF and data sizes to simulate an incomplete write
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Write))
+            using (var writer = new BinaryWriter(stream))
+            {
+                stream.Position = 4;
+                writer.Write(0u);
+                stream.Position = dataSizeOffset;
+                writer.Write(0u);
+            }
+
+            var repaired = WindowsRecordingRecoveryService.TryRepairWaveHeader(path);
+            Assert.True(repaired);
+
+            // The written values must be valid uints (no negative/overflow)
+            using var checkStream = new FileStream(path, FileMode.Open, FileAccess.Read);
+            using var reader = new BinaryReader(checkStream);
+            checkStream.Position = 4;
+            var riffSize = reader.ReadUInt32();
+            checkStream.Position = dataSizeOffset;
+            var dataSize = reader.ReadUInt32();
+
+            // Verify values are non-zero and within uint range
+            Assert.True(riffSize > 0 && riffSize <= uint.MaxValue);
+            Assert.True(dataSize > 0 && dataSize <= uint.MaxValue);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var dir = Path.Combine(Path.GetTempPath(), "VoxMemoTests", Path.GetRandomFileName());

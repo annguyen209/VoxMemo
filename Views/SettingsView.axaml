@@ -344,6 +344,16 @@
                         <TextBlock Text="{Binding StartupLabel}" FontSize="13"/>
                     </CheckBox>
 
+                    <TextBlock Text="Theme" FontSize="13" Foreground="#bac2de" Margin="0,16,0,6"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <RadioButton x:Name="DarkRadio" Content="Dark" GroupName="Theme"
+                                     Checked="OnDarkThemeChecked"
+                                     Foreground="#cdd6f4" FontSize="13"/>
+                        <RadioButton x:Name="LightRadio" Content="Light" GroupName="Theme"
+                                     Checked="OnLightThemeChecked"
+                                     Foreground="#cdd6f4" FontSize="13"/>
+                    </StackPanel>
+
                     <StackPanel Spacing="6">
                         <TextBlock Text="Storage Location" FontSize="12" Foreground="#6c7086"/>
                         <DockPanel>

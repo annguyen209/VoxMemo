@@ -24,6 +24,7 @@ public class MacAudioRecorderService : IAudioRecorder, IDisposable
 
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<string>? RecordingError;
+    public event EventHandler<string>? RecordingStatus;
 
     public bool IsRecording => _recordProcess != null && !_recordProcess.HasExited;
     public bool IsPaused => _isPaused;

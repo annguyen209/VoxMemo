@@ -131,18 +131,19 @@ public partial class MainWindowViewModel : ViewModelBase
             _ = OnRecordingSavedAsync(meetingId);
         };
 
-        MeetingItemViewModel.JobRequested += (sender, args) =>
+        MeetingDetailViewModel.JobRequested += (sender, args) =>
         {
             var (meetingId, action) = args;
-            var meetingVm = sender as MeetingItemViewModel;
+            var detailVm = sender as MeetingDetailViewModel;
+            var meetingVm = Meetings.Meetings.FirstOrDefault(m => m.Detail == detailVm);
             var title = meetingVm?.Title ?? meetingId;
 
              if (action.StartsWith("pipeline:"))
              {
                  var steps = action["pipeline:".Length..];
-                 var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
-                 var hasTranscript = !string.IsNullOrEmpty(meetingVm?.TranscriptText);
-                 var hasSpeakers = hasTranscript && HasSpeakerLabels(meetingVm!.TranscriptText);
+                 var hasAudio = !string.IsNullOrEmpty(detailVm?.AudioPath);
+                 var hasTranscript = !string.IsNullOrEmpty(detailVm?.TranscriptText);
+                 var hasSpeakers = hasTranscript && HasSpeakerLabels(detailVm!.TranscriptText);
 
                  // Transcribe: skip only if no audio. Dialog will ask about overwrite if transcript exists
                  if (steps.Contains('t') && hasAudio)
@@ -182,7 +183,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _ => Recording
         };
 
-        if (value == 1)
+        if (value == 1 && Meetings.SelectedMeeting?.Playback.IsPlaybackActive != true)
         {
             _ = Meetings.LoadMeetingsCommand.ExecuteAsync(null);
         }
@@ -296,7 +297,7 @@ public partial class MainWindowViewModel : ViewModelBase
                      var idx = JobQueue.IndexOf(job);
                      if (idx > 0) JobQueue.Move(idx, 0);
                      var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                     if (vm != null) vm.IsBusy = true;
+                     if (vm != null) vm.Detail.IsBusy = true;
                  });
 
                  SetStatus($"Processing: {job.MeetingTitle}");
@@ -308,8 +309,16 @@ public partial class MainWindowViewModel : ViewModelBase
                      if (hasExisting)
                      {
                          // Must show dialog on UI thread
-                         var shouldOverwrite = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
-                             ShowTranscriptOverwriteDialogAsync());
+                         var shouldOverwrite = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                         {
+                             if (Avalonia.Application.Current?.ApplicationLifetime
+                                 is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                                 || desktop.MainWindow == null)
+                                 return true;
+                             var dlg = new VoxMemo.Views.Dialogs.TranscriptOverwriteDialog();
+                             await dlg.ShowDialog(desktop.MainWindow);
+                             return dlg.ShouldOverwrite;
+                         });
                          if (!shouldOverwrite)
                          {
                              // User chose to skip - mark as complete without processing
@@ -323,8 +332,8 @@ public partial class MainWindowViewModel : ViewModelBase
                                  var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                                  if (vm != null)
                                  {
-                                     vm.IsBusy = false;
-                                     vm.StatusMessage = "Transcription skipped - existing transcript retained";
+                                     vm.Detail.IsBusy = false;
+                                     vm.Detail.StatusMessage = "Transcription skipped - existing transcript retained";
                                  }
                              });
                              ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} - transcription skipped (existing retained)");
@@ -346,7 +355,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     job.Status = "Complete";
                     job.MarkFinished();
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = false;
+                    if (vm != null) vm.Detail.IsBusy = false;
                 });
 
                 ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} completed ({job.Elapsed})");
@@ -361,7 +370,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     job.Status = "Cancelled";
                     job.MarkFinished();
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = false;
+                    if (vm != null) vm.Detail.IsBusy = false;
                 });
                 SetStatus("", false);
             }
@@ -405,8 +414,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                     if (vm != null)
                     {
-                        vm.IsBusy = false;
-                        vm.StatusMessage = $"Error: {errorMsg}";
+                        vm.Detail.IsBusy = false;
+                        vm.Detail.StatusMessage = $"Error: {errorMsg}";
                     }
                 });
                 SetStatus("", false);
@@ -421,7 +430,7 @@ public partial class MainWindowViewModel : ViewModelBase
          string? whisperModel = null;
          string? audioPath = null;
          string language = "en";
-         await using (var db = new AppDbContext())
+         await using (var db = AppDbContextFactory.Create())
          {
              var wmSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "whisper_model");
              whisperModel = wmSetting?.Value;
@@ -439,7 +448,7 @@ public partial class MainWindowViewModel : ViewModelBase
          var service = new Services.Transcription.WhisperTranscriptionService();
          var result = await service.TranscribeAsync(audioPath, language, model, job.Cts.Token);
 
-         await using var dbSave = new AppDbContext();
+         await using var dbSave = AppDbContextFactory.Create();
          
          // Delete existing transcripts for this meeting to replace with new one
          var existingTranscripts = await dbSave.Transcripts
@@ -478,8 +487,8 @@ public partial class MainWindowViewModel : ViewModelBase
              var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
              if (vm != null)
              {
-                 vm.TranscriptText = result.FullText;
-                 vm.StatusMessage = "Transcription complete";
+                 vm.Detail.TranscriptText = result.FullText;
+                 vm.Detail.StatusMessage = "Transcription complete";
              }
          });
      }
@@ -490,7 +499,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         string? transcriptText;
         string language = "en";
-        await using (var db = new AppDbContext())
+        await using (var db = AppDbContextFactory.Create())
         {
             var meeting = await db.Meetings.FindAsync(meetingId);
             if (meeting != null) language = meeting.Language;
@@ -503,7 +512,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (transcript == null || string.IsNullOrEmpty(transcript.FullText))
             {
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                transcriptText = vm?.TranscriptText;
+                transcriptText = vm?.Detail.TranscriptText;
             }
             else
             {
@@ -525,7 +534,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (!string.IsNullOrWhiteSpace(summary))
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             db.Summaries.Add(new Summary
             {
                 MeetingId = meetingId,
@@ -543,8 +552,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
-                    vm.SummaryText = summary;
-                    vm.StatusMessage = "Summary complete";
+                    vm.Detail.SummaryText = summary;
+                    vm.Detail.StatusMessage = "Summary complete";
                 }
             });
         }
@@ -556,7 +565,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         string? transcriptText;
         string language = "en";
-        await using (var db = new AppDbContext())
+        await using (var db = AppDbContextFactory.Create())
         {
             var meeting = await db.Meetings.FindAsync(meetingId);
             if (meeting != null) language = meeting.Language;
@@ -569,11 +578,14 @@ public partial class MainWindowViewModel : ViewModelBase
             if (transcript == null || string.IsNullOrEmpty(transcript.FullText))
             {
                 var vm2 = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                transcriptText = vm2?.TranscriptText;
+                transcriptText = vm2?.Detail.TranscriptText;
             }
             else
             {
-                transcriptText = transcript.FullText;
+                // Use original text (before any speaker ID) if available
+                transcriptText = !string.IsNullOrEmpty(transcript.OriginalFullText)
+                    ? transcript.OriginalFullText
+                    : transcript.FullText;
             }
         }
 
@@ -592,7 +604,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (!string.IsNullOrWhiteSpace(result))
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var transcript = await db.Transcripts
                 .Where(t => t.MeetingId == meetingId)
                 .OrderByDescending(t => t.CreatedAt)
@@ -612,11 +624,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
-                    if (string.IsNullOrEmpty(vm.OriginalTranscriptText))
-                        vm.OriginalTranscriptText = transcriptText;
-                    vm.TranscriptText = result;
-                    vm.ShowOriginalTranscript = false;
-                    vm.StatusMessage = "Speakers identified";
+                    vm.Detail.SpeakersText = result;
+                    vm.Detail.StatusMessage = "Speakers identified";
                 }
             });
         }
@@ -635,7 +644,7 @@ public partial class MainWindowViewModel : ViewModelBase
             string smartSteps = "tsm";
             try
             {
-                await using var db = new AppDbContext();
+                await using var db = AppDbContextFactory.Create();
                 var atSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "auto_transcribe");
                 var asSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "auto_summarize");
                 var stepsSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
@@ -718,7 +727,7 @@ public partial class MainWindowViewModel : ViewModelBase
      {
          try
          {
-             await using var db = new AppDbContext();
+             await using var db = AppDbContextFactory.Create();
              return await db.Transcripts
                  .Where(t => t.MeetingId == meetingId)
                  .AnyAsync();
@@ -728,96 +737,6 @@ public partial class MainWindowViewModel : ViewModelBase
              Log.Error(ex, "Error checking for existing transcript for {MeetingId}", meetingId);
              return false;
          }
-     }
-
-     /// <summary>Shows a dialog asking user to overwrite or skip existing transcript.</summary>
-     private static async Task<bool> ShowTranscriptOverwriteDialogAsync()
-     {
-         if (Avalonia.Application.Current?.ApplicationLifetime
-             is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-             || desktop.MainWindow == null)
-             return true; // Default to overwrite if can't show dialog
-
-         var shouldOverwrite = false;
-         var dialog = new Avalonia.Controls.Window
-         {
-             Title = "Transcript Already Exists",
-             Width = 440,
-             SizeToContent = Avalonia.Controls.SizeToContent.Height,
-             WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-             CanResize = false,
-             Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-             ExtendClientAreaToDecorationsHint = false,
-         };
-
-         var root = new Avalonia.Controls.Border
-         {
-             Padding = new Avalonia.Thickness(28, 24),
-             Child = new Avalonia.Controls.StackPanel
-             {
-                 Spacing = 20,
-             }
-         };
-
-         var contentPanel = (Avalonia.Controls.StackPanel)root.Child;
-
-         // Message
-         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-         {
-             Text = "This meeting already has a transcript.",
-             FontSize = 14,
-             Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-         });
-
-         // Detail
-         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-         {
-             Text = "Would you like to overwrite it with a new transcription, or keep the existing one?",
-             FontSize = 12,
-             Foreground = Avalonia.Media.Brush.Parse("#7f849c"),
-             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-         });
-
-         // Buttons
-         var buttonPanel = new Avalonia.Controls.StackPanel
-         {
-             Orientation = Avalonia.Layout.Orientation.Horizontal,
-             Spacing = 10,
-             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-             Margin = new Avalonia.Thickness(0, 4, 0, 0),
-         };
-
-         var skipBtn = new Avalonia.Controls.Button
-         {
-             Content = "Keep Existing",
-             Background = Avalonia.Media.Brush.Parse("#313244"),
-             Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-             Padding = new Avalonia.Thickness(24, 10),
-             CornerRadius = new Avalonia.CornerRadius(8),
-             FontSize = 13,
-         };
-         skipBtn.Click += (_, _) => { shouldOverwrite = false; dialog.Close(); };
-
-         var overwriteBtn = new Avalonia.Controls.Button
-         {
-             Content = "Overwrite",
-             Background = Avalonia.Media.Brush.Parse("#a6e3a1"),
-             Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
-             Padding = new Avalonia.Thickness(24, 10),
-             CornerRadius = new Avalonia.CornerRadius(8),
-             FontSize = 13,
-             FontWeight = Avalonia.Media.FontWeight.SemiBold,
-         };
-         overwriteBtn.Click += (_, _) => { shouldOverwrite = true; dialog.Close(); };
-
-         buttonPanel.Children.Add(skipBtn);
-         buttonPanel.Children.Add(overwriteBtn);
-         contentPanel.Children.Add(buttonPanel);
-
-         dialog.Content = root;
-         await dialog.ShowDialog(desktop.MainWindow);
-         return shouldOverwrite;
      }
 
      /// <summary>Determines if an error is transient and worth retrying.</summary>

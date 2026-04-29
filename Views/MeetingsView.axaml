@@ -124,7 +124,7 @@
                             <Button DockPanel.Dock="Right"
                                     Command="{Binding $parent[UserControl].((vm:MeetingsViewModel)DataContext).DeleteMeetingCommand}"
                                     CommandParameter="{Binding}"
-                                    IsEnabled="{Binding !IsBusy}"
+                                    IsEnabled="{Binding !Detail.IsBusy}"
                                     Background="#45475a" Foreground="#f38ba8"
                                     CornerRadius="6" Padding="14,6"
                                     VerticalAlignment="Center">
@@ -132,8 +132,15 @@
                             </Button>
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold"
-                                           Foreground="#cdd6f4" TextTrimming="CharacterEllipsis"/>
+                                <TextBox Text="{Binding Title}"
+                                         FontSize="20" FontWeight="Bold"
+                                         Foreground="#cdd6f4"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="0"
+                                         Watermark="Meeting title..."
+                                         LostFocus="OnTitleLostFocus"
+                                         KeyDown="OnTitleKeyDown"/>
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <TextBlock Text="{Binding Platform}" FontSize="12" Foreground="#bac2de"
                                                VerticalAlignment="Center"/>
@@ -154,8 +161,8 @@
 
                     <!-- Status -->
                     <Border DockPanel.Dock="Top" Padding="24,8"
-                            IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                        <TextBlock Text="{Binding StatusMessage}"
+                            IsVisible="{Binding Detail.StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding Detail.StatusMessage}"
                                    FontSize="13" Foreground="#fab387"/>
                     </Border>
 
@@ -178,7 +185,7 @@
                                         <TextBlock Text="Audio Player" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="#a6adc8" VerticalAlignment="Center"/>
                                         <Button DockPanel.Dock="Right"
-                                                Command="{Binding ExportAudioCommand}"
+                                                Command="{Binding Detail.ExportAudioCommand}"
                                                 Background="#313244" Foreground="#bac2de"
                                                 CornerRadius="6" Padding="10,4" FontSize="11"
                                                 HorizontalAlignment="Right">
@@ -188,9 +195,9 @@
 
                                     <!-- Seek Slider -->
                                     <Slider Minimum="0"
-                                            Maximum="{Binding PlaybackTotalSeconds}"
-                                            Value="{Binding PlaybackCurrentSeconds}"
-                                            IsEnabled="{Binding IsPlaybackActive}"
+                                            Maximum="{Binding Playback.PlaybackTotalSeconds}"
+                                            Value="{Binding Playback.PlaybackCurrentSeconds}"
+                                            IsEnabled="{Binding Playback.IsPlaybackActive}"
                                             x:Name="SeekSlider"
                                             Foreground="#cba6f7"
                                             Background="#313244"/>
@@ -198,25 +205,25 @@
                                     <!-- Controls + Time -->
                                     <DockPanel>
                                         <TextBlock DockPanel.Dock="Right"
-                                                   Text="{Binding PlaybackPosition}"
+                                                   Text="{Binding Playback.PlaybackPosition}"
                                                    FontSize="12" Foreground="#a6adc8"
                                                    VerticalAlignment="Center"
                                                    FontFamily="Consolas, Courier New"/>
                                         <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <Button Command="{Binding PlayAudioCommand}"
-                                                    IsEnabled="{Binding !IsPlaying}"
+                                            <Button Command="{Binding Playback.PlayAudioCommand}"
+                                                    IsEnabled="{Binding !Playback.IsPlaying}"
                                                     Background="#cba6f7" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="14,6" MinWidth="64">
                                                 <TextBlock Text="Play" FontSize="12" FontWeight="SemiBold"/>
                                             </Button>
-                                            <Button Command="{Binding PauseAudioCommand}"
-                                                    IsEnabled="{Binding IsPlaying}"
+                                            <Button Command="{Binding Playback.PauseAudioCommand}"
+                                                    IsEnabled="{Binding Playback.IsPlaying}"
                                                     Background="#fab387" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="14,6" MinWidth="64">
                                                 <TextBlock Text="Pause" FontSize="12" FontWeight="SemiBold"/>
                                             </Button>
-                                            <Button Command="{Binding StopAudioCommand}"
-                                                    IsEnabled="{Binding IsPlaybackActive}"
+                                            <Button Command="{Binding Playback.StopAudioCommand}"
+                                                    IsEnabled="{Binding Playback.IsPlaybackActive}"
                                                     Background="#eba0ac" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="14,6" MinWidth="64">
                                                 <TextBlock Text="Stop" FontSize="12" FontWeight="SemiBold"/>
@@ -228,20 +235,48 @@
 
                             <!-- Processing indicator -->
                             <Border Background="#313244" CornerRadius="8" Padding="12,8"
-                                    IsVisible="{Binding IsBusy}">
+                                    IsVisible="{Binding Detail.IsBusy}">
                                 <TextBlock Text="Processing in background... new jobs will be queued."
                                            FontSize="12" Foreground="#cba6f7"/>
                             </Border>
 
-                            <!-- Action Button -->
-                            <Button Command="{Binding ProcessAllCommand}"
-                                    Background="#cba6f7" Foreground="#1e1e2e"
-                                    CornerRadius="8" Padding="20,10">
-                                <TextBlock Text="Smart Process" FontSize="13" FontWeight="SemiBold"/>
-                            </Button>
+                            <!-- Action Buttons -->
+                            <StackPanel Spacing="8">
+                                <Button Command="{Binding Detail.ProcessAllCommand}"
+                                        Background="#cba6f7" Foreground="#1e1e2e"
+                                        CornerRadius="8" Padding="20,10" HorizontalAlignment="Left">
+                                    <TextBlock Text="Smart Process" FontSize="13" FontWeight="SemiBold"/>
+                                </Button>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Command="{Binding Detail.TranscribeCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding HasAudio}"
+                                            Background="#89b4fa" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Transcribe"/>
+                                    </Button>
+                                    <Button Command="{Binding Detail.IdentifySpeakersCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding Detail.TranscriptText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                            Background="#f9e2af" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Identify Speakers"/>
+                                    </Button>
+                                    <Button Command="{Binding Detail.SummarizeCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding Detail.TranscriptText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                            Background="#a6e3a1" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Summarize"/>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
 
                             <!-- Tabs -->
-                            <TabControl SelectedIndex="{Binding SelectedTabIndex}">
+                            <TabControl SelectedIndex="{Binding Detail.SelectedTabIndex}">
                                 <TabControl.Styles>
                                     <Style Selector="TabItem">
                                         <Setter Property="FontSize" Value="14"/>
@@ -254,41 +289,24 @@
                                     <DockPanel Margin="0,12">
                                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
                                                     HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
-                                            <Button Command="{Binding ToggleOriginalTranscriptCommand}"
-                                                    IsVisible="{Binding HasOriginalTranscript}"
-                                                    Background="#45475a" Foreground="#cdd6f4"
-                                                    CornerRadius="6" Padding="12,5" FontSize="12">
-                                                <TextBlock Text="{Binding TranscriptViewLabel}"/>
-                                            </Button>
-                                            <Button Command="{Binding SaveTranscriptCommand}"
-                                                    IsVisible="{Binding !ShowOriginalTranscript}"
+                                            <Button Command="{Binding Detail.SaveTranscriptCommand}"
                                                     Background="#cba6f7" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="12,5" FontSize="12"
                                                     FontWeight="SemiBold">
                                                 <TextBlock Text="Save"/>
                                             </Button>
-                                            <Button Command="{Binding CopyTranscriptCommand}"
+                                            <Button Command="{Binding Detail.CopyTranscriptCommand}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Copy"/>
                                             </Button>
-                                            <Button Command="{Binding ExportTranscriptCommand}"
-                                                    IsVisible="{Binding !ShowOriginalTranscript}"
+                                            <Button Command="{Binding Detail.ExportTranscriptCommand}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Export"/>
                                             </Button>
                                         </StackPanel>
-                                        <TextBox Text="{Binding OriginalTranscriptText}"
-                                                 IsVisible="{Binding ShowOriginalTranscript}"
-                                                 IsReadOnly="True"
-                                                 AcceptsReturn="True"
-                                                 TextWrapping="Wrap"
-                                                 Background="#1e1e2e" Foreground="#a6adc8"
-                                                 CornerRadius="8" Padding="16"
-                                                 MinHeight="250"/>
-                                        <TextBox Text="{Binding TranscriptText}"
-                                                 IsVisible="{Binding !ShowOriginalTranscript}"
+                                        <TextBox Text="{Binding Detail.TranscriptText}"
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
                                                  Background="#1e1e2e" Foreground="#cdd6f4"
@@ -298,22 +316,48 @@
                                     </DockPanel>
                                 </TabItem>
 
-                                <TabItem Header="Summary">
+                                <TabItem Header="Speakers" IsVisible="{Binding Detail.HasSpeakers}">
                                     <DockPanel Margin="0,12">
                                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
                                                     HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
-                                            <Button Command="{Binding CopySummaryCommand}"
+                                            <Button Command="{Binding Detail.CopySpeakersCommand}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Copy"/>
                                             </Button>
-                                            <Button Command="{Binding ExportSummaryCommand}"
+                                            <Button Command="{Binding Detail.ExportSpeakersCommand}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Export"/>
                                             </Button>
                                         </StackPanel>
-                                        <TextBox Text="{Binding SummaryText}"
+                                        <TextBox Text="{Binding Detail.SpeakersText}"
+                                                 IsReadOnly="True"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 Background="#1e1e2e" Foreground="#f9e2af"
+                                                 CornerRadius="8" Padding="16"
+                                                 Watermark="No speaker identification yet. Click 'Identify Speakers' to label dialog."
+                                                 MinHeight="250"/>
+                                    </DockPanel>
+                                </TabItem>
+
+                                <TabItem Header="Summary">
+                                    <DockPanel Margin="0,12">
+                                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                                    HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
+                                            <Button Command="{Binding Detail.CopySummaryCommand}"
+                                                    Background="#313244" Foreground="#bac2de"
+                                                    CornerRadius="6" Padding="12,5" FontSize="12">
+                                                <TextBlock Text="Copy"/>
+                                            </Button>
+                                            <Button Command="{Binding Detail.ExportSummaryCommand}"
+                                                    Background="#313244" Foreground="#bac2de"
+                                                    CornerRadius="6" Padding="12,5" FontSize="12">
+                                                <TextBlock Text="Export"/>
+                                            </Button>
+                                        </StackPanel>
+                                        <TextBox Text="{Binding Detail.SummaryText}"
                                                  IsReadOnly="True"
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
@@ -322,6 +366,36 @@
                                                  Watermark="No summary yet. Transcribe first, then click 'Summarize'."
                                                  MinHeight="250"/>
                                     </DockPanel>
+                                </TabItem>
+                                <TabItem Header="Segments" IsVisible="{Binding Detail.HasSegments}">
+                                    <ListBox x:Name="SegmentsListBox"
+                                             ItemsSource="{Binding Detail.Segments}"
+                                             SelectionChanged="OnSegmentSelected"
+                                             Background="Transparent"
+                                             Margin="0,12">
+                                        <ListBox.Styles>
+                                            <Style Selector="ListBoxItem">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                            </Style>
+                                        </ListBox.Styles>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SegmentItemViewModel">
+                                                <Grid ColumnDefinitions="60,*">
+                                                    <Border Grid.Column="0" Background="#313244"
+                                                            CornerRadius="4" Padding="6,3"
+                                                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                            Margin="0,2,8,0">
+                                                        <TextBlock Text="{Binding Timestamp}"
+                                                                   FontSize="11" Foreground="#89b4fa"
+                                                                   FontFamily="Consolas, Courier New"/>
+                                                    </Border>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Text}"
+                                                               FontSize="13" Foreground="#cdd6f4"
+                                                               TextWrapping="Wrap"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </TabItem>
                             </TabControl>
                         </StackPanel>

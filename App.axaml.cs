@@ -76,6 +76,22 @@ public partial class App : Application
             }
         }
 
+        // Apply saved theme
+        string savedTheme = "dark";
+        try
+        {
+            await using var themeDb = AppDbContextFactory.Create();
+            var themeSetting = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .FirstOrDefaultAsync(themeDb.AppSettings, s => s.Key == "ui_theme");
+            if (themeSetting != null && !string.IsNullOrEmpty(themeSetting.Value))
+                savedTheme = themeSetting.Value;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to load theme setting, defaulting to dark");
+        }
+        SetTheme(savedTheme);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Log.Information("Setting up main window");
@@ -114,6 +130,13 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    public void SetTheme(string theme)
+    {
+        RequestedThemeVariant = theme == "light"
+            ? Avalonia.Styling.ThemeVariant.Light
+            : Avalonia.Styling.ThemeVariant.Dark;
     }
 
     /// <summary>
@@ -285,7 +308,7 @@ public partial class App : Application
         string hotkey = "Ctrl+Shift+R";
         try
         {
-            await using var db = new AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var setting = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
                 .FirstOrDefaultAsync(db.AppSettings, s => s.Key == "recording_hotkey");
             if (setting != null && !string.IsNullOrEmpty(setting.Value))
