@@ -12,6 +12,8 @@ public partial class CreateFromTextDialog : Window
 {
     public CreateFromTextResult? Result { get; private set; }
 
+    public CreateFromTextDialog() => InitializeComponent();
+
     public CreateFromTextDialog(string defaultLanguage, List<string> languages)
     {
         InitializeComponent();

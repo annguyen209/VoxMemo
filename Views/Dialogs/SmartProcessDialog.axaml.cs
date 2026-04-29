@@ -8,6 +8,8 @@ public partial class SmartProcessDialog : Window
 {
     public SmartProcessOptions? Options { get; private set; }
 
+    public SmartProcessDialog() => InitializeComponent();
+
     public SmartProcessDialog(string savedSteps)
     {
         InitializeComponent();

@@ -7,6 +7,8 @@ public partial class ConfirmDialog : Window
 {
     public bool Confirmed { get; private set; }
 
+    public ConfirmDialog() => InitializeComponent();
+
     public ConfirmDialog(
         string title,
         string message,
