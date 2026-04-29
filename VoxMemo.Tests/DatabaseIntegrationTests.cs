@@ -107,9 +107,10 @@ public class DatabaseIntegrationTests
             Confidence = 0.89f
         });
         
+        db.Meetings.Add(new Meeting { Id = "meeting-segments-test", Title = "Segments Test Meeting" });
         db.Transcripts.Add(transcript);
         await db.SaveChangesAsync();
-        
+
         var retrieved = await db.Transcripts
             .Include(t => t.Segments)
             .FirstOrDefaultAsync(t => t.Id == "transcript-with-segments");
