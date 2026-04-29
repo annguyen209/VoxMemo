@@ -120,8 +120,12 @@ public static class WindowsRecordingRecoveryService
             if (dataSizeOffset == null || dataStartOffset == null)
                 return false;
 
-            var actualRiffSize = (uint)Math.Max(0, stream.Length - 8);
-            var actualDataSize = (uint)Math.Max(0, stream.Length - dataStartOffset.Value);
+            var rawRiffSize = Math.Max(0L, stream.Length - 8);
+            var rawDataSize = Math.Max(0L, stream.Length - dataStartOffset.Value);
+            // Clamp to uint.MaxValue — WAV files > 4 GB have unusable headers regardless,
+            // but clamping prevents silent int overflow from writing garbage.
+            var actualRiffSize = (uint)Math.Min(rawRiffSize, uint.MaxValue);
+            var actualDataSize = (uint)Math.Min(rawDataSize, uint.MaxValue);
 
             if (storedRiffSize == actualRiffSize && storedDataSize == actualDataSize)
                 return true;
