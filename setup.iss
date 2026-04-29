@@ -12,7 +12,7 @@ SolidCompression=yes
 SetupIconFile=Assets\voxmemo-icon.ico
 UninstallDisplayIcon={app}\VoxMemo.exe
 PrivilegesRequired=lowest
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 
 [Files]
