@@ -131,18 +131,19 @@ public partial class MainWindowViewModel : ViewModelBase
             _ = OnRecordingSavedAsync(meetingId);
         };
 
-        MeetingItemViewModel.JobRequested += (sender, args) =>
+        MeetingDetailViewModel.JobRequested += (sender, args) =>
         {
             var (meetingId, action) = args;
-            var meetingVm = sender as MeetingItemViewModel;
+            var detailVm = sender as MeetingDetailViewModel;
+            var meetingVm = Meetings.Meetings.FirstOrDefault(m => m.Detail == detailVm);
             var title = meetingVm?.Title ?? meetingId;
 
              if (action.StartsWith("pipeline:"))
              {
                  var steps = action["pipeline:".Length..];
-                 var hasAudio = !string.IsNullOrEmpty(meetingVm?.AudioPath);
-                 var hasTranscript = !string.IsNullOrEmpty(meetingVm?.TranscriptText);
-                 var hasSpeakers = hasTranscript && HasSpeakerLabels(meetingVm!.TranscriptText);
+                 var hasAudio = !string.IsNullOrEmpty(detailVm?.AudioPath);
+                 var hasTranscript = !string.IsNullOrEmpty(detailVm?.TranscriptText);
+                 var hasSpeakers = hasTranscript && HasSpeakerLabels(detailVm!.TranscriptText);
 
                  // Transcribe: skip only if no audio. Dialog will ask about overwrite if transcript exists
                  if (steps.Contains('t') && hasAudio)
@@ -296,7 +297,7 @@ public partial class MainWindowViewModel : ViewModelBase
                      var idx = JobQueue.IndexOf(job);
                      if (idx > 0) JobQueue.Move(idx, 0);
                      var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                     if (vm != null) vm.IsBusy = true;
+                     if (vm != null) vm.Detail.IsBusy = true;
                  });
 
                  SetStatus($"Processing: {job.MeetingTitle}");
@@ -323,8 +324,8 @@ public partial class MainWindowViewModel : ViewModelBase
                                  var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                                  if (vm != null)
                                  {
-                                     vm.IsBusy = false;
-                                     vm.StatusMessage = "Transcription skipped - existing transcript retained";
+                                     vm.Detail.IsBusy = false;
+                                     vm.Detail.StatusMessage = "Transcription skipped - existing transcript retained";
                                  }
                              });
                              ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} - transcription skipped (existing retained)");
@@ -346,7 +347,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     job.Status = "Complete";
                     job.MarkFinished();
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = false;
+                    if (vm != null) vm.Detail.IsBusy = false;
                 });
 
                 ShowTrayNotification("VoxMemo", $"{job.MeetingTitle} completed ({job.Elapsed})");
@@ -361,7 +362,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     job.Status = "Cancelled";
                     job.MarkFinished();
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                    if (vm != null) vm.IsBusy = false;
+                    if (vm != null) vm.Detail.IsBusy = false;
                 });
                 SetStatus("", false);
             }
@@ -405,8 +406,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                     if (vm != null)
                     {
-                        vm.IsBusy = false;
-                        vm.StatusMessage = $"Error: {errorMsg}";
+                        vm.Detail.IsBusy = false;
+                        vm.Detail.StatusMessage = $"Error: {errorMsg}";
                     }
                 });
                 SetStatus("", false);
@@ -478,8 +479,8 @@ public partial class MainWindowViewModel : ViewModelBase
              var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
              if (vm != null)
              {
-                 vm.TranscriptText = result.FullText;
-                 vm.StatusMessage = "Transcription complete";
+                 vm.Detail.TranscriptText = result.FullText;
+                 vm.Detail.StatusMessage = "Transcription complete";
              }
          });
      }
@@ -503,7 +504,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (transcript == null || string.IsNullOrEmpty(transcript.FullText))
             {
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                transcriptText = vm?.TranscriptText;
+                transcriptText = vm?.Detail.TranscriptText;
             }
             else
             {
@@ -543,8 +544,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
-                    vm.SummaryText = summary;
-                    vm.StatusMessage = "Summary complete";
+                    vm.Detail.SummaryText = summary;
+                    vm.Detail.StatusMessage = "Summary complete";
                 }
             });
         }
@@ -569,7 +570,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (transcript == null || string.IsNullOrEmpty(transcript.FullText))
             {
                 var vm2 = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
-                transcriptText = vm2?.TranscriptText;
+                transcriptText = vm2?.Detail.TranscriptText;
             }
             else
             {
@@ -612,11 +613,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
-                    if (string.IsNullOrEmpty(vm.OriginalTranscriptText))
-                        vm.OriginalTranscriptText = transcriptText;
-                    vm.TranscriptText = result;
-                    vm.ShowOriginalTranscript = false;
-                    vm.StatusMessage = "Speakers identified";
+                    if (string.IsNullOrEmpty(vm.Detail.OriginalTranscriptText))
+                        vm.Detail.OriginalTranscriptText = transcriptText;
+                    vm.Detail.TranscriptText = result;
+                    vm.Detail.ShowOriginalTranscript = false;
+                    vm.Detail.StatusMessage = "Speakers identified";
                 }
             });
         }

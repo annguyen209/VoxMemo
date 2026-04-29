@@ -45,12 +45,12 @@ public partial class MeetingsView : UserControl
         thumb.DragStarted += (_, _) =>
         {
             if (_seekSlider.DataContext is MeetingItemViewModel vm)
-                vm.BeginSeek();
+                vm.Playback.BeginSeek();
         };
         thumb.DragCompleted += (_, _) =>
         {
             if (_seekSlider.DataContext is MeetingItemViewModel vm)
-                vm.EndSeek();
+                vm.Playback.EndSeek();
         };
         _thumbWired = true;
     }
@@ -58,13 +58,13 @@ public partial class MeetingsView : UserControl
     private void OnSliderValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
         // Only handle user-initiated track clicks (not thumb drags or programmatic updates)
-        if (_seekSlider?.DataContext is MeetingItemViewModel vm && vm.IsPlaybackActive)
+        if (_seekSlider?.DataContext is MeetingItemViewModel vm && vm.Playback.IsPlaybackActive)
         {
             // If the change is large (>1 second jump), it's likely a track click
             var delta = Math.Abs(e.NewValue - e.OldValue);
             if (delta > 1.0)
             {
-                vm.SeekTo(e.NewValue);
+                vm.Playback.SeekTo(e.NewValue);
             }
         }
     }

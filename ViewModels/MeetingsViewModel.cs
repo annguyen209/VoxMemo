@@ -569,10 +569,10 @@ public partial class MeetingItemViewModel : ViewModelBase
     public bool HasTranscript { get; }
     public bool HasSummary { get; }
 
-    /// <summary>Available languages for the dropdown, loaded from settings.</summary>
-    public ObservableCollection<string> AvailableLanguages { get; } = new(LoadLanguageCodes());
+    public System.Collections.ObjectModel.ObservableCollection<string> AvailableLanguages { get; }
+        = new(LoadLanguageCodes());
 
-    private static List<string> LoadLanguageCodes()
+    private static System.Collections.Generic.List<string> LoadLanguageCodes()
     {
         try
         {
@@ -585,76 +585,14 @@ public partial class MeetingItemViewModel : ViewModelBase
         return ["en", "vi"];
     }
 
-    [ObservableProperty]
-    private string _transcriptText = string.Empty;
-
-    [ObservableProperty]
-    private string _originalTranscriptText = string.Empty;
-
-    [ObservableProperty]
-    private bool _showOriginalTranscript;
-
-    public bool HasOriginalTranscript => !string.IsNullOrEmpty(OriginalTranscriptText);
-    public string TranscriptViewLabel => ShowOriginalTranscript ? "Show Identified" : "Show Original";
-
-    partial void OnOriginalTranscriptTextChanged(string value)
-    {
-        OnPropertyChanged(nameof(HasOriginalTranscript));
-        OnPropertyChanged(nameof(TranscriptViewLabel));
-    }
-
-    partial void OnShowOriginalTranscriptChanged(bool value) => OnPropertyChanged(nameof(TranscriptViewLabel));
-
-    [RelayCommand]
-    private void ToggleOriginalTranscript() => ShowOriginalTranscript = !ShowOriginalTranscript;
-
-    [ObservableProperty]
-    private string _summaryText = string.Empty;
-
-    [ObservableProperty]
-    private bool _isTranscribing;
-
-    [ObservableProperty]
-    private bool _isSummarizing;
-
-    [ObservableProperty]
-    private bool _isBusy; // set by auto-process pipeline
-
-    [ObservableProperty]
-    private string _statusMessage = string.Empty;
-
-    [ObservableProperty]
-    private int _selectedTabIndex;
-
-    // Audio playback
-    private IAudioPlaybackService? _player;
-    private CancellationTokenSource? _playbackTimerCts;
-    private bool _isSeeking;
-
-    [ObservableProperty]
-    private bool _isPlaybackActive; // true when audio is loaded (playing or paused)
-
-    [ObservableProperty]
-    private bool _isPlaying;
-
-    [ObservableProperty]
-    private bool _isPlaybackPaused;
-
-    [ObservableProperty]
-    private string _playbackPosition = "00:00 / 00:00";
-
-    [ObservableProperty]
-    private double _playbackCurrentSeconds;
-
-    [ObservableProperty]
-    private double _playbackTotalSeconds;
-
     private bool _langInitDone;
 
-    public MeetingItemViewModel(Meeting meeting)
+    public MeetingItemViewModel(VoxMemo.Models.Meeting meeting)
     {
         Id = meeting.Id;
-        _title = string.IsNullOrEmpty(meeting.Title) ? $"Meeting {meeting.StartedAt:g}" : meeting.Title;
+        _title = string.IsNullOrEmpty(meeting.Title)
+            ? $"Meeting {meeting.StartedAt:g}"
+            : meeting.Title;
         Platform = meeting.Platform ?? "Other";
         StartedAt = meeting.StartedAt;
         AudioPath = meeting.AudioPath ?? string.Empty;
@@ -662,7 +600,7 @@ public partial class MeetingItemViewModel : ViewModelBase
 
         if (meeting.DurationMs.HasValue)
         {
-            var ts = TimeSpan.FromMilliseconds(meeting.DurationMs.Value);
+            var ts = System.TimeSpan.FromMilliseconds(meeting.DurationMs.Value);
             Duration = ts.ToString(@"hh\:mm\:ss");
         }
         else
@@ -673,17 +611,41 @@ public partial class MeetingItemViewModel : ViewModelBase
         HasTranscript = meeting.Transcripts.Count > 0;
         HasSummary = meeting.Summaries.Count > 0;
 
+        string transcriptText = string.Empty;
+        string originalTranscriptText = string.Empty;
         if (HasTranscript)
         {
             var t = meeting.Transcripts.OrderByDescending(t => t.CreatedAt).First();
-            TranscriptText = t.FullText ?? string.Empty;
-            OriginalTranscriptText = t.OriginalFullText ?? string.Empty;
+            transcriptText = t.FullText ?? string.Empty;
+            originalTranscriptText = t.OriginalFullText ?? string.Empty;
         }
-        if (HasSummary)
-            SummaryText = meeting.Summaries.First().Content;
+
+        string summaryText = HasSummary ? meeting.Summaries.First().Content : string.Empty;
+
+        var segments = (meeting.Transcripts
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefault()
+            ?.Segments
+            .OrderBy(s => s.StartMs)
+            .Select(s => new SegmentItemViewModel(s.StartMs, s.EndMs, s.Text))
+            ?? System.Linq.Enumerable.Empty<SegmentItemViewModel>());
+
+        Playback = new AudioPlaybackViewModel(AudioPath);
+        Detail = new MeetingDetailViewModel(
+            meetingId: Id,
+            audioPath: AudioPath,
+            language: _language,
+            onTitleSaved: newTitle => Title = newTitle,
+            transcriptText: transcriptText,
+            originalTranscriptText: originalTranscriptText,
+            summaryText: summaryText,
+            segments: segments);
 
         _langInitDone = true;
     }
+
+    public AudioPlaybackViewModel Playback { get; }
+    public MeetingDetailViewModel Detail { get; }
 
     partial void OnLanguageChanged(string value)
     {
@@ -691,7 +653,7 @@ public partial class MeetingItemViewModel : ViewModelBase
         _ = SaveLanguageAsync(value);
     }
 
-    private async Task SaveLanguageAsync(string language)
+    private async System.Threading.Tasks.Task SaveLanguageAsync(string language)
     {
         try
         {
@@ -701,542 +663,16 @@ public partial class MeetingItemViewModel : ViewModelBase
             {
                 meeting.Language = language;
                 await db.SaveChangesAsync();
-                StatusMessage = $"Language changed to {language}";
+                Detail.StatusMessage = $"Language changed to {language}";
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to save language: {ex.Message}";
+            Serilog.Log.Error(ex, "Failed to save language for {Id}", Id);
+            Detail.StatusMessage = $"Failed to save language: {ex.Message}";
         }
     }
 
-    private static Avalonia.Input.Platform.IClipboard? GetClipboard()
-    {
-        if (Avalonia.Application.Current?.ApplicationLifetime
-            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-            return desktop.MainWindow?.Clipboard;
-        return null;
-    }
-
-    [RelayCommand]
-    private async Task SaveTranscriptAsync()
-    {
-        if (string.IsNullOrEmpty(TranscriptText)) return;
-
-        try
-        {
-            await using var db = AppDbContextFactory.Create();
-            var transcript = await db.Transcripts
-                .Where(t => t.MeetingId == Id)
-                .OrderByDescending(t => t.CreatedAt)
-                .FirstOrDefaultAsync();
-
-            if (transcript != null)
-            {
-                transcript.FullText = TranscriptText;
-                await db.SaveChangesAsync();
-                Log.Information("Transcript saved for meeting {Id}", Id);
-                StatusMessage = "Transcript saved";
-            }
-            else
-            {
-                // No transcript record yet — create one
-                db.Transcripts.Add(new Transcript
-                {
-                    MeetingId = Id,
-                    Engine = "manual",
-                    Language = Language,
-                    FullText = TranscriptText,
-                });
-                await db.SaveChangesAsync();
-                Log.Information("New transcript created for meeting {Id}", Id);
-                StatusMessage = "Transcript saved";
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to save transcript for {Id}", Id);
-            StatusMessage = $"Save failed: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private async Task CopyTranscriptAsync()
-    {
-        var text = ShowOriginalTranscript ? OriginalTranscriptText : TranscriptText;
-        if (string.IsNullOrEmpty(text)) return;
-        var clipboard = GetClipboard();
-        if (clipboard != null)
-        {
-            await clipboard.SetTextAsync(text);
-            StatusMessage = "Transcript copied to clipboard";
-        }
-    }
-
-    [RelayCommand]
-    private async Task CopySummaryAsync()
-    {
-        if (string.IsNullOrEmpty(SummaryText)) return;
-        var clipboard = GetClipboard();
-        if (clipboard != null)
-        {
-            await clipboard.SetTextAsync(SummaryText);
-            StatusMessage = "Summary copied to clipboard";
-        }
-    }
-
-    private static async Task<string?> ShowSaveDialogAsync(string suggestedName, string extension, string filterName, string[] patterns)
-    {
-        if (Avalonia.Application.Current?.ApplicationLifetime
-            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-            && desktop.MainWindow != null)
-        {
-            var dialog = new Avalonia.Platform.Storage.FilePickerSaveOptions
-            {
-                SuggestedFileName = suggestedName,
-                DefaultExtension = extension,
-                FileTypeChoices =
-                [
-                    new Avalonia.Platform.Storage.FilePickerFileType(filterName) { Patterns = patterns }
-                ]
-            };
-
-            var result = await desktop.MainWindow.StorageProvider.SaveFilePickerAsync(dialog);
-            return result?.Path.LocalPath;
-        }
-        return null;
-    }
-
-    [RelayCommand]
-    private async Task ExportAudioAsync()
-    {
-        if (string.IsNullOrEmpty(AudioPath) || !File.Exists(AudioPath)) return;
-
-        try
-        {
-            var destPath = await ShowSaveDialogAsync(
-                Path.GetFileName(AudioPath),
-                Path.GetExtension(AudioPath).TrimStart('.'),
-                "Audio files", ["*.wav", "*.mp3"]);
-
-            if (destPath != null)
-            {
-                File.Copy(AudioPath, destPath, true);
-                StatusMessage = $"Audio exported to {Path.GetFileName(destPath)}";
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Export failed: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private async Task ExportTranscriptAsync()
-    {
-        if (string.IsNullOrEmpty(TranscriptText)) return;
-
-        try
-        {
-            var safeName = Title.Length > 50 ? Title[..50] : Title;
-            var destPath = await ShowSaveDialogAsync(
-                $"{safeName} - Transcript.txt", "txt",
-                "Text files", ["*.txt", "*.md"]);
-
-            if (destPath != null)
-            {
-                await File.WriteAllTextAsync(destPath, TranscriptText);
-                StatusMessage = $"Transcript exported to {Path.GetFileName(destPath)}";
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Export failed: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private async Task ExportSummaryAsync()
-    {
-        if (string.IsNullOrEmpty(SummaryText)) return;
-
-        try
-        {
-            var safeName = Title.Length > 50 ? Title[..50] : Title;
-            var destPath = await ShowSaveDialogAsync(
-                $"{safeName} - Summary.txt", "txt",
-                "Text files", ["*.txt", "*.md"]);
-
-            if (destPath != null)
-            {
-                await File.WriteAllTextAsync(destPath, SummaryText);
-                StatusMessage = $"Summary exported to {Path.GetFileName(destPath)}";
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Export failed: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void PlayAudio()
-    {
-        if (IsPlaying) return;
-
-        if (IsPlaybackPaused && _player?.IsInitialized == true)
-        {
-            _player.Play();
-            IsPlaying = true;
-            IsPlaybackPaused = false;
-            return;
-        }
-
-        if (string.IsNullOrEmpty(AudioPath) || !File.Exists(AudioPath)) return;
-
-        try
-        {
-            _player = PlatformServices.CreatePlaybackService();
-            _player.PlaybackStopped += (_, _) =>
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (!IsPlaybackPaused)
-                        StopAudioInternal();
-                });
-            };
-            _player.Init(AudioPath);
-
-            PlaybackTotalSeconds = _player.TotalTime.TotalSeconds;
-            _player.Play();
-            IsPlaying = true;
-            IsPlaybackActive = true;
-            IsPlaybackPaused = false;
-
-            _playbackTimerCts = new CancellationTokenSource();
-            _ = UpdatePlaybackPositionAsync(_playbackTimerCts.Token);
-        }
-        catch
-        {
-            StopAudioInternal();
-        }
-    }
-
-    [RelayCommand]
-    private void PauseAudio()
-    {
-        if (!IsPlaying || _player == null) return;
-
-        _player.Pause();
-        IsPlaying = false;
-        IsPlaybackPaused = true;
-    }
-
-    [RelayCommand]
-    private void StopAudio()
-    {
-        StopAudioInternal();
-    }
-
-    private void StopAudioInternal()
-    {
-        _playbackTimerCts?.Cancel();
-        _playbackTimerCts?.Dispose();
-        _playbackTimerCts = null;
-
-        _player?.Dispose();
-        _player = null;
-
-        IsPlaying = false;
-        IsPlaybackPaused = false;
-        IsPlaybackActive = false;
-        PlaybackCurrentSeconds = 0;
-        PlaybackTotalSeconds = 0;
-        PlaybackPosition = "00:00 / 00:00";
-    }
-
-    partial void OnPlaybackCurrentSecondsChanged(double value)
-    {
-        if (_isSeeking && _player?.IsInitialized == true)
-        {
-            _player.CurrentTime = TimeSpan.FromSeconds(value);
-        }
-    }
-
-    public void BeginSeek() => _isSeeking = true;
-
-    public void EndSeek()
-    {
-        if (_player?.IsInitialized == true)
-        {
-            _player.CurrentTime = TimeSpan.FromSeconds(PlaybackCurrentSeconds);
-        }
-        _isSeeking = false;
-    }
-
-    public void SeekTo(double seconds)
-    {
-        if (_player?.IsInitialized == true && IsPlaybackActive)
-        {
-            _player.CurrentTime = TimeSpan.FromSeconds(seconds);
-            PlaybackCurrentSeconds = seconds;
-        }
-    }
-
-    private async Task UpdatePlaybackPositionAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested && _player?.IsInitialized == true)
-        {
-            try
-            {
-                var current = _player.CurrentTime;
-                var total = _player.TotalTime;
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (!_isSeeking)
-                        PlaybackCurrentSeconds = current.TotalSeconds;
-                    PlaybackPosition = $"{current:mm\\:ss} / {total:mm\\:ss}";
-                });
-                await Task.Delay(250, ct);
-            }
-            catch { break; }
-        }
-    }
-
-    /// <summary>Raised when user clicks Transcribe, Summarize, etc. to enqueue via MainWindowViewModel.</summary>
-    public static event EventHandler<(string meetingId, string action)>? JobRequested;
-
-    /// <summary>Raised when a meeting is deleted, so MainWindowViewModel can cancel/remove related jobs.</summary>
     public static event EventHandler<string>? MeetingDeleted;
     public static void RaiseMeetingDeleted(string meetingId) => MeetingDeleted?.Invoke(null, meetingId);
-
-    [RelayCommand]
-    private void Transcribe()
-    {
-        if (string.IsNullOrEmpty(AudioPath))
-        {
-            StatusMessage = "No audio file — this meeting was imported from text.";
-            return;
-        }
-        StatusMessage = "Queued for transcription...";
-        JobRequested?.Invoke(this, (Id, "transcribe"));
-    }
-
-    [RelayCommand]
-    private void Summarize()
-    {
-        if (string.IsNullOrEmpty(TranscriptText))
-        {
-            StatusMessage = "No transcript to summarize. Transcribe first.";
-            return;
-        }
-        StatusMessage = "Queued for summarization...";
-        JobRequested?.Invoke(this, (Id, "summarize"));
-    }
-
-    [RelayCommand]
-    private async Task ProcessAllAsync()
-    {
-        // Need either audio (for transcription) or existing transcript (for speaker ID / summary)
-        if (string.IsNullOrEmpty(AudioPath) && string.IsNullOrEmpty(TranscriptText)) return;
-
-        // Check "don't ask again" setting
-        bool skipDialog = false;
-        string savedSteps = "tsm"; // default all
-        try
-        {
-            await using var db = AppDbContextFactory.Create();
-            var skipSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
-            var stepsSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
-            skipDialog = skipSetting?.Value == "true";
-            if (stepsSetting != null) savedSteps = stepsSetting.Value;
-        }
-        catch { }
-
-        if (skipDialog)
-        {
-            StatusMessage = "Queued for processing...";
-            JobRequested?.Invoke(this, (Id, $"pipeline:{savedSteps}"));
-            return;
-        }
-
-        if (Avalonia.Application.Current?.ApplicationLifetime
-            is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-            || desktop.MainWindow == null)
-            return;
-
-        var doTranscribe = savedSteps.Contains('t');
-        var doSpeakers = savedSteps.Contains('s');
-        var doSummarize = savedSteps.Contains('m');
-        var dontAskAgain = false;
-        var confirmed = false;
-
-        var dialog = new Avalonia.Controls.Window
-        {
-            Title = "Smart Process",
-            Width = 420,
-            SizeToContent = Avalonia.Controls.SizeToContent.Height,
-            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-        };
-
-        var content = new Avalonia.Controls.StackPanel
-        {
-            Margin = new Avalonia.Thickness(28, 24),
-            Spacing = 16,
-        };
-
-        content.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = "Select processing steps:",
-            FontSize = 14, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-        });
-
-        var chkTranscribe = new Avalonia.Controls.CheckBox
-        {
-            IsChecked = doTranscribe, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Content = new Avalonia.Controls.StackPanel
-            {
-                Spacing = 2,
-                Children =
-                {
-                    new Avalonia.Controls.TextBlock { Text = "1. Transcribe audio", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#89b4fa"), FontWeight = Avalonia.Media.FontWeight.SemiBold },
-                    new Avalonia.Controls.TextBlock { Text = "Convert audio to text using Whisper", FontSize = 11, Foreground = Avalonia.Media.Brush.Parse("#bac2de") },
-                }
-            }
-        };
-
-        var chkSpeakers = new Avalonia.Controls.CheckBox
-        {
-            IsChecked = doSpeakers, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Content = new Avalonia.Controls.StackPanel
-            {
-                Spacing = 2,
-                Children =
-                {
-                    new Avalonia.Controls.TextBlock { Text = "2. Identify speakers", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#f9e2af"), FontWeight = Avalonia.Media.FontWeight.SemiBold },
-                    new Avalonia.Controls.TextBlock { Text = "AI reformats transcript as dialog with speaker labels", FontSize = 11, Foreground = Avalonia.Media.Brush.Parse("#bac2de") },
-                }
-            }
-        };
-
-        var chkSummarize = new Avalonia.Controls.CheckBox
-        {
-            IsChecked = doSummarize, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Content = new Avalonia.Controls.StackPanel
-            {
-                Spacing = 2,
-                Children =
-                {
-                    new Avalonia.Controls.TextBlock { Text = "3. Summarize with AI", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#a6e3a1"), FontWeight = Avalonia.Media.FontWeight.SemiBold },
-                    new Avalonia.Controls.TextBlock { Text = "Generate a meeting summary from the transcript", FontSize = 11, Foreground = Avalonia.Media.Brush.Parse("#bac2de") },
-                }
-            }
-        };
-
-        content.Children.Add(chkTranscribe);
-        content.Children.Add(chkSpeakers);
-        content.Children.Add(chkSummarize);
-
-        // Separator
-        content.Children.Add(new Avalonia.Controls.Border
-        {
-            Height = 1, Background = Avalonia.Media.Brush.Parse("#313244"),
-        });
-
-        var chkDontAsk = new Avalonia.Controls.CheckBox
-        {
-            IsChecked = false, Foreground = Avalonia.Media.Brush.Parse("#7f849c"),
-            Content = new Avalonia.Controls.TextBlock
-            {
-                Text = "Don't ask again (reset in Settings)",
-                FontSize = 12,
-            },
-        };
-        content.Children.Add(chkDontAsk);
-
-        var buttons = new Avalonia.Controls.StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 10,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Margin = new Avalonia.Thickness(0, 4, 0, 0),
-        };
-
-        var cancelBtn = new Avalonia.Controls.Button
-        {
-            Content = "Cancel",
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-        };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        var startBtn = new Avalonia.Controls.Button
-        {
-            Content = "Start Processing",
-            Background = Avalonia.Media.Brush.Parse("#cba6f7"),
-            Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-        };
-        startBtn.Click += (_, _) =>
-        {
-            doTranscribe = chkTranscribe.IsChecked == true;
-            doSpeakers = chkSpeakers.IsChecked == true;
-            doSummarize = chkSummarize.IsChecked == true;
-            dontAskAgain = chkDontAsk.IsChecked == true;
-            confirmed = true;
-            dialog.Close();
-        };
-
-        buttons.Children.Add(cancelBtn);
-        buttons.Children.Add(startBtn);
-        content.Children.Add(buttons);
-        dialog.Content = content;
-
-        await dialog.ShowDialog(desktop.MainWindow);
-        if (!confirmed) return;
-
-        // Save "don't ask again" preference
-        var steps = $"{(doTranscribe ? "t" : "")}{(doSpeakers ? "s" : "")}{(doSummarize ? "m" : "")}";
-        if (dontAskAgain)
-        {
-            try
-            {
-                await using var db = AppDbContextFactory.Create();
-                var skipSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
-                if (skipSetting != null) skipSetting.Value = "true";
-                else db.AppSettings.Add(new Models.AppSettings { Key = "smart_process_skip_dialog", Value = "true" });
-
-                var stepsSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
-                if (stepsSetting != null) stepsSetting.Value = steps;
-                else db.AppSettings.Add(new Models.AppSettings { Key = "smart_process_steps", Value = steps });
-
-                await db.SaveChangesAsync();
-            }
-            catch { }
-        }
-
-        StatusMessage = "Queued for processing...";
-        JobRequested?.Invoke(this, (Id, $"pipeline:{steps}"));
-    }
-
-    [RelayCommand]
-    private void IdentifySpeakers()
-    {
-        if (string.IsNullOrEmpty(TranscriptText))
-        {
-            StatusMessage = "No transcript. Transcribe first.";
-            return;
-        }
-        StatusMessage = "Queued for speaker identification...";
-        JobRequested?.Invoke(this, (Id, "identify_speakers"));
-    }
-
 }
