@@ -286,7 +286,7 @@ public partial class RecordingViewModel : ViewModelBase
                                 {
                                     LiveCaptionText = string.IsNullOrEmpty(LiveCaptionText)
                                         ? newChunk
-                                        : LiveCaptionText + "\n" + newChunk;
+                                        : LiveCaptionText + "\n\n" + newChunk;
                                 });
                             }
                         }
