@@ -62,7 +62,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            await using var db = new Services.Database.AppDbContext();
+            await using var db = AppDbContextFactory.Create();
             var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
             if (setting != null) setting.Value = value;
             else db.AppSettings.Add(new Models.AppSettings { Key = key, Value = value });
