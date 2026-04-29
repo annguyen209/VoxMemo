@@ -164,12 +164,14 @@
                         </Border>
                     </DockPanel>
 
-                    <Border Background="#313244" CornerRadius="8" Padding="16" MinHeight="80">
+                    <ScrollViewer x:Name="CaptionScrollViewer"
+                                  MaxHeight="220" MinHeight="80"
+                                  Background="#313244" CornerRadius="8">
                         <TextBlock Text="{Binding LiveCaptionText}"
                                    TextWrapping="Wrap"
-                                   FontSize="15" Foreground="#cdd6f4"
-                                   Opacity="0.9"/>
-                    </Border>
+                                   FontSize="14" Foreground="#cdd6f4"
+                                   Padding="16" Opacity="0.9"/>
+                    </ScrollViewer>
 
                     <TextBlock Text="{Binding LiveCaptionsEnabled,
                         Converter={x:Static views:RecordingView.CaptionStatusConverter}}"

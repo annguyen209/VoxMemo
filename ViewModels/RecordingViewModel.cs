@@ -25,6 +25,7 @@ public partial class RecordingViewModel : ViewModelBase
     private string? _currentAudioPath;
     private DateTime _recordingStartedAt;
     private CancellationTokenSource? _liveCaptionCts;
+    private string _lastCaptionChunk = string.Empty;
 
     [ObservableProperty]
     private bool _isRecording;
@@ -206,6 +207,7 @@ public partial class RecordingViewModel : ViewModelBase
             ? $"Recording mic + speaker (mixed)..."
             : $"Recording from {SelectedAudioSource}...";
         LiveCaptionText = string.Empty;
+        _lastCaptionChunk = string.Empty;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
@@ -273,21 +275,20 @@ public partial class RecordingViewModel : ViewModelBase
                             var result = await transcriber.TranscribeAsync(
                                 snapshotPath, SelectedLanguage, captionModel, ct);
 
-                            Dispatcher.UIThread.Post(() =>
+                            var newChunk = result.Segments.Count > 0
+                                ? string.Join(" ", result.Segments.ConvertAll(s => s.Text.Trim())).Trim()
+                                : string.Empty;
+
+                            if (!string.IsNullOrEmpty(newChunk) && newChunk != _lastCaptionChunk)
                             {
-                                if (result.Segments.Count > 0)
+                                _lastCaptionChunk = newChunk;
+                                Dispatcher.UIThread.Post(() =>
                                 {
-                                    var count = Math.Min(5, result.Segments.Count);
-                                    var lastSegments = result.Segments.GetRange(
-                                        result.Segments.Count - count, count);
-                                    LiveCaptionText = string.Join(" ",
-                                        lastSegments.ConvertAll(s => s.Text));
-                                }
-                                else
-                                {
-                                    LiveCaptionText = "(listening...)";
-                                }
-                            });
+                                    LiveCaptionText = string.IsNullOrEmpty(LiveCaptionText)
+                                        ? newChunk
+                                        : LiveCaptionText + "\n" + newChunk;
+                                });
+                            }
                         }
                         finally
                         {

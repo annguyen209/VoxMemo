@@ -1,10 +1,38 @@
+using System;
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Data.Converters;
+using VoxMemo.ViewModels;
 
 namespace VoxMemo.Views;
 
 public partial class RecordingView : UserControl
 {
+    private RecordingViewModel? _prevVm;
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        if (_prevVm != null)
+            _prevVm.PropertyChanged -= OnVmPropertyChanged;
+        base.OnDataContextChanged(e);
+        if (DataContext is RecordingViewModel vm)
+        {
+            _prevVm = vm;
+            vm.PropertyChanged += OnVmPropertyChanged;
+        }
+        else
+        {
+            _prevVm = null;
+        }
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(RecordingViewModel.LiveCaptionText))
+            // Clamp to max offset — Avalonia ignores out-of-range values gracefully
+            CaptionScrollViewer.Offset = new Avalonia.Vector(0, double.MaxValue);
+    }
+
     public static readonly IValueConverter LevelToWidthConverter =
         new FuncValueConverter<float, double>(level => level * 400);
 
