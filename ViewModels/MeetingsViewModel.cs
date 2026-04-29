@@ -20,6 +20,7 @@ namespace VoxMemo.ViewModels;
 public partial class MeetingsViewModel : ViewModelBase
 {
     private List<MeetingItemViewModel> _allMeetings = [];
+    private Avalonia.Threading.DispatcherTimer? _searchDebounce;
 
     [ObservableProperty]
     private ObservableCollection<MeetingItemViewModel> _meetings = [];
@@ -43,27 +44,42 @@ public partial class MeetingsViewModel : ViewModelBase
 
     partial void OnSearchTextChanged(string value)
     {
-        FilterMeetings();
+        _searchDebounce?.Stop();
+        _searchDebounce = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _searchDebounce.Tick += (_, _) =>
+        {
+            _searchDebounce.Stop();
+            FilterMeetings();
+        };
+        _searchDebounce.Start();
     }
 
     private void FilterMeetings()
     {
         var query = SearchText?.Trim() ?? "";
-        var filtered = string.IsNullOrEmpty(query)
-            ? _allMeetings
-            : _allMeetings.Where(m =>
-                m.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                m.Platform.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                m.StartedAt.ToString("MMM dd, yyyy").Contains(query, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
+        var filtered = ApplyFilter(_allMeetings, query);
         Meetings.Clear();
         foreach (var m in filtered)
             Meetings.Add(m);
-
         MeetingCount = _allMeetings.Count == filtered.Count
             ? $"{_allMeetings.Count} meetings"
             : $"{filtered.Count} of {_allMeetings.Count} meetings";
+    }
+
+    public static List<MeetingItemViewModel> ApplyFilter(
+        List<MeetingItemViewModel> source, string query)
+    {
+        if (string.IsNullOrEmpty(query)) return source;
+        return source.Where(m =>
+            m.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            m.Platform.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            m.StartedAt.ToString("MMM dd, yyyy").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            m.Detail.TranscriptText.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            m.Detail.SummaryText.Contains(query, StringComparison.OrdinalIgnoreCase)
+        ).ToList();
     }
 
     [RelayCommand]
@@ -77,6 +93,7 @@ public partial class MeetingsViewModel : ViewModelBase
 
             var meetings = await db.Meetings
                 .Include(m => m.Transcripts)
+                    .ThenInclude(t => t.Segments)
                 .Include(m => m.Summaries)
                 .OrderByDescending(m => m.StartedAt)
                 .ToListAsync();
@@ -84,7 +101,11 @@ public partial class MeetingsViewModel : ViewModelBase
             _allMeetings = meetings.Select(m => new MeetingItemViewModel(m)).ToList();
             FilterMeetings();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to load meetings");
+            MeetingCount = "Failed to load";
+        }
         finally
         {
             IsLoading = false;
