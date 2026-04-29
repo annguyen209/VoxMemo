@@ -222,6 +222,66 @@ Exceptions that are truly safe to swallow (e.g., `File.Delete` on a temp file in
 
 ---
 
+## 6b. Long Recording Reliability
+
+### Root causes
+
+| # | Issue | Symptom |
+|---|---|---|
+| 1 | `MediaFoundationResampler` (COM) fails on inputs ≥ ~1 GB | "Warning: conversion failed" after stop; recording saved but not in Whisper format; transcription fails |
+| 2 | `TryCreateMixedRecording` return value discarded; on failure the output file is never created | "Recording is empty" with no explanation; two temp files orphaned on disk |
+| 3 | `WaveFileWriter` stores chunk sizes as `uint` (max ~4 GB); same overflow in `TryRepairWaveHeader` | Corrupted WAV header after ~3.1 hours at 48 kHz 32-bit float stereo |
+| 4 | `catch { }` in all three data handlers swallows disk-full and I/O errors silently | Audio data dropped mid-recording with no user notification |
+| 5 | No progress feedback during mix + convert; for 1-hour recordings this takes 1–3 minutes | App appears frozen after Stop |
+
+### Fixes
+
+**Fix 1 — Replace `MediaFoundationResampler` with `WdlResamplingSampleProvider`**  
+`WindowsAudioConverter.ConvertToWhisperFormat` replaces the MF COM pipeline with a pure managed resample + convert chain:
+```csharp
+var resampler = new WdlResamplingSampleProvider(reader.ToSampleProvider(), 16000);
+var mono = resampler.ToMono();
+WaveFileWriter.CreateWaveFile16(outputPath, mono);
+```
+No file-size limit, no COM dependency, same output quality.
+
+**Fix 2 — Handle mix failure gracefully**  
+`WindowsAudioRecorderService.StopRecordingAsync` checks the `bool` result of `TryCreateMixedRecording`. On `false`, it falls back to using whichever single-source temp file is larger (sys preferred, then mic), moves it to the output path, and includes a message in `RecordingError`: "Mix failed — saved [mic/sys] audio only."
+
+**Fix 3 — WAV 4 GB safeguard**  
+Before recording starts, estimate max temp file size:
+```
+bytesPerSecond = format.AverageBytesPerSecond
+```
+If the estimated size at 4 hours would exceed 3.8 GB, log a warning. At the 3.8 GB mark during recording, fire `RecordingError` with "Recording approaching file size limit — stop soon or audio may be truncated." (Automatic rotation is out of scope for now; the warning covers the practical case.)
+
+Also fix the `uint` cast in `TryRepairWaveHeader`:
+```csharp
+// Before (overflows for files > 4 GB):
+var actualRiffSize = (uint)Math.Max(0, stream.Length - 8);
+// After (clamp to uint.MaxValue — file is unusable past 4 GB but header won't corrupt):
+var actualRiffSize = (uint)Math.Min(stream.Length - 8, uint.MaxValue);
+```
+
+**Fix 4 — Log errors in data handlers**  
+Replace `catch { }` in `OnDataAvailable`, `OnMicDataAvailable`, `OnSysDataAvailable` with:
+```csharp
+catch (Exception ex)
+{
+    Log.Error(ex, "Audio write failed");
+    RecordingError?.Invoke(this, $"Audio write failed: {ex.Message}");
+}
+```
+Fire only once per session (gate with a `_writeErrorReported` flag) to avoid flooding the UI.
+
+**Fix 5 — Progress feedback during mix and convert**  
+`StopRecordingAsync` passes a status callback into the mix and convert steps:
+- Before mix: `StatusMessage = "Mixing audio tracks (may take a minute for long recordings)..."`
+- Before convert: `StatusMessage = "Converting to transcription format..."`
+- On completion: `StatusMessage = $"Saved: {title}"`
+
+---
+
 ## 7. Files Changed Summary
 
 ### New files
@@ -245,3 +305,6 @@ Exceptions that are truly safe to swallow (e.g., `File.Delete` on a temp file in
 - `App.axaml.cs` — startup theme read, SetTheme implementation
 - `Program.cs` — register IDbContextFactory
 - `Services/Database/AppDbContext.cs` — any schema changes for segment eager loading
+- `Services/Platform/Windows/WindowsAudioConverter.cs` — replace MediaFoundationResampler with WdlResamplingSampleProvider
+- `Services/Platform/Windows/WindowsAudioRecorderService.cs` — mix fallback, 4 GB warning, fix data handler catch blocks, progress status messages
+- `Services/Platform/Windows/WindowsRecordingRecoveryService.cs` — fix uint overflow in TryRepairWaveHeader
