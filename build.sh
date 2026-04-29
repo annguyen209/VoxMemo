@@ -4,7 +4,7 @@ set -e
 echo "=== VoxMemo Cross-Platform Build ==="
 
 PUBLISH_DIR="publish"
-VERSION="1.2.0"
+VERSION="1.4.0"
 
 # Clean
 rm -rf "$PUBLISH_DIR"
