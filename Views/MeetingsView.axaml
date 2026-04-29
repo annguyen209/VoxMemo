@@ -132,8 +132,15 @@
                             </Button>
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold"
-                                           Foreground="#cdd6f4" TextTrimming="CharacterEllipsis"/>
+                                <TextBox Text="{Binding Title}"
+                                         FontSize="20" FontWeight="Bold"
+                                         Foreground="#cdd6f4"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="0"
+                                         Watermark="Meeting title..."
+                                         LostFocus="OnTitleLostFocus"
+                                         KeyDown="OnTitleKeyDown"/>
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <TextBlock Text="{Binding Platform}" FontSize="12" Foreground="#bac2de"
                                                VerticalAlignment="Center"/>
@@ -233,12 +240,40 @@
                                            FontSize="12" Foreground="#cba6f7"/>
                             </Border>
 
-                            <!-- Action Button -->
-                            <Button Command="{Binding Detail.ProcessAllCommand}"
-                                    Background="#cba6f7" Foreground="#1e1e2e"
-                                    CornerRadius="8" Padding="20,10">
-                                <TextBlock Text="Smart Process" FontSize="13" FontWeight="SemiBold"/>
-                            </Button>
+                            <!-- Action Buttons -->
+                            <StackPanel Spacing="8">
+                                <Button Command="{Binding Detail.ProcessAllCommand}"
+                                        Background="#cba6f7" Foreground="#1e1e2e"
+                                        CornerRadius="8" Padding="20,10" HorizontalAlignment="Left">
+                                    <TextBlock Text="Smart Process" FontSize="13" FontWeight="SemiBold"/>
+                                </Button>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Command="{Binding Detail.TranscribeCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding HasAudio}"
+                                            Background="#89b4fa" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Transcribe"/>
+                                    </Button>
+                                    <Button Command="{Binding Detail.IdentifySpeakersCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding HasTranscript}"
+                                            Background="#f9e2af" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Identify Speakers"/>
+                                    </Button>
+                                    <Button Command="{Binding Detail.SummarizeCommand}"
+                                            IsEnabled="{Binding !Detail.IsBusy}"
+                                            IsVisible="{Binding HasTranscript}"
+                                            Background="#a6e3a1" Foreground="#1e1e2e"
+                                            CornerRadius="6" Padding="14,6" FontSize="12"
+                                            FontWeight="SemiBold">
+                                        <TextBlock Text="Summarize"/>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
 
                             <!-- Tabs -->
                             <TabControl SelectedIndex="{Binding Detail.SelectedTabIndex}">

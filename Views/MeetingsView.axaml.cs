@@ -68,4 +68,29 @@ public partial class MeetingsView : UserControl
             }
         }
     }
+
+    private void OnTitleLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Avalonia.Controls.TextBox tb &&
+            DataContext is VoxMemo.ViewModels.MeetingsViewModel vm &&
+            vm.SelectedMeeting != null)
+        {
+            _ = vm.SelectedMeeting.Detail.SaveTitleCommand.ExecuteAsync(tb.Text);
+        }
+    }
+
+    private void OnTitleKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.TextBox tb) return;
+        if (e.Key == Avalonia.Input.Key.Enter)
+        {
+            if (DataContext is VoxMemo.ViewModels.MeetingsViewModel vm && vm.SelectedMeeting != null)
+                _ = vm.SelectedMeeting.Detail.SaveTitleCommand.ExecuteAsync(tb.Text);
+        }
+        else if (e.Key == Avalonia.Input.Key.Escape)
+        {
+            if (DataContext is VoxMemo.ViewModels.MeetingsViewModel vm && vm.SelectedMeeting != null)
+                tb.Text = vm.SelectedMeeting.Title;
+        }
+    }
 }
