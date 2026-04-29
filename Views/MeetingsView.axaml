@@ -358,6 +358,36 @@
                                                  MinHeight="250"/>
                                     </DockPanel>
                                 </TabItem>
+                                <TabItem Header="Segments" IsVisible="{Binding Detail.HasSegments}">
+                                    <ListBox x:Name="SegmentsListBox"
+                                             ItemsSource="{Binding Detail.Segments}"
+                                             SelectionChanged="OnSegmentSelected"
+                                             Background="Transparent"
+                                             Margin="0,12">
+                                        <ListBox.Styles>
+                                            <Style Selector="ListBoxItem">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                            </Style>
+                                        </ListBox.Styles>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SegmentItemViewModel">
+                                                <Grid ColumnDefinitions="60,*">
+                                                    <Border Grid.Column="0" Background="#313244"
+                                                            CornerRadius="4" Padding="6,3"
+                                                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                            Margin="0,2,8,0">
+                                                        <TextBlock Text="{Binding Timestamp}"
+                                                                   FontSize="11" Foreground="#89b4fa"
+                                                                   FontFamily="Consolas, Courier New"/>
+                                                    </Border>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Text}"
+                                                               FontSize="13" Foreground="#cdd6f4"
+                                                               TextWrapping="Wrap"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </TabItem>
                             </TabControl>
                         </StackPanel>
                     </ScrollViewer>

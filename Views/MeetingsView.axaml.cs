@@ -69,6 +69,17 @@ public partial class MeetingsView : UserControl
         }
     }
 
+    private void OnSegmentSelected(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0) return;
+        if (e.AddedItems[0] is VoxMemo.ViewModels.SegmentItemViewModel seg &&
+            DataContext is VoxMemo.ViewModels.MeetingsViewModel vm &&
+            vm.SelectedMeeting?.Playback.IsPlaybackActive == true)
+        {
+            vm.SelectedMeeting.Playback.SeekTo(seg.StartSeconds);
+        }
+    }
+
     private void OnTitleLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is Avalonia.Controls.TextBox tb &&
