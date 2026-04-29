@@ -29,8 +29,7 @@ public partial class RecordingView : UserControl
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(RecordingViewModel.LiveCaptionText))
-            // Clamp to max offset — Avalonia ignores out-of-range values gracefully
-            CaptionScrollViewer.Offset = new Avalonia.Vector(0, double.MaxValue);
+            CaptionScrollViewer.CaretIndex = CaptionScrollViewer.Text?.Length ?? 0;
     }
 
     public static readonly IValueConverter LevelToWidthConverter =
