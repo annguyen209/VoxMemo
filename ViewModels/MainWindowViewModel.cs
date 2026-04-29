@@ -582,7 +582,10 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             else
             {
-                transcriptText = transcript.FullText;
+                // Use original text (before any speaker ID) if available
+                transcriptText = !string.IsNullOrEmpty(transcript.OriginalFullText)
+                    ? transcript.OriginalFullText
+                    : transcript.FullText;
             }
         }
 
@@ -621,10 +624,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 var vm = Meetings.Meetings.FirstOrDefault(m => m.Id == meetingId);
                 if (vm != null)
                 {
-                    if (string.IsNullOrEmpty(vm.Detail.OriginalTranscriptText))
-                        vm.Detail.OriginalTranscriptText = transcriptText;
-                    vm.Detail.TranscriptText = result;
-                    vm.Detail.ShowOriginalTranscript = false;
+                    vm.Detail.SpeakersText = result;
                     vm.Detail.StatusMessage = "Speakers identified";
                 }
             });

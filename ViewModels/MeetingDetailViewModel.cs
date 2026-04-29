@@ -20,8 +20,7 @@ public partial class MeetingDetailViewModel : ViewModelBase
     private readonly Action<string> _onTitleSaved;
 
     [ObservableProperty] private string _transcriptText = string.Empty;
-    [ObservableProperty] private string _originalTranscriptText = string.Empty;
-    [ObservableProperty] private bool _showOriginalTranscript;
+    [ObservableProperty] private string _speakersText = string.Empty;
     [ObservableProperty] private string _summaryText = string.Empty;
     [ObservableProperty] private bool _isTranscribing;
     [ObservableProperty] private bool _isSummarizing;
@@ -31,19 +30,12 @@ public partial class MeetingDetailViewModel : ViewModelBase
 
     public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
     public bool HasSegments => Segments.Count > 0;
-    public bool HasOriginalTranscript => !string.IsNullOrEmpty(OriginalTranscriptText);
-    public string TranscriptViewLabel => ShowOriginalTranscript ? "Show Identified" : "Show Original";
+    public bool HasSpeakers => !string.IsNullOrEmpty(SpeakersText);
     public string AudioPath { get; }
     public bool HasAudio => !string.IsNullOrEmpty(AudioPath);
 
-    partial void OnOriginalTranscriptTextChanged(string value)
-    {
-        OnPropertyChanged(nameof(HasOriginalTranscript));
-        OnPropertyChanged(nameof(TranscriptViewLabel));
-    }
-
-    partial void OnShowOriginalTranscriptChanged(bool value) =>
-        OnPropertyChanged(nameof(TranscriptViewLabel));
+    partial void OnSpeakersTextChanged(string value) =>
+        OnPropertyChanged(nameof(HasSpeakers));
 
     public static event EventHandler<(string meetingId, string action)>? JobRequested;
 
@@ -53,7 +45,7 @@ public partial class MeetingDetailViewModel : ViewModelBase
         string language,
         Action<string> onTitleSaved,
         string transcriptText,
-        string originalTranscriptText,
+        string speakersText,
         string summaryText,
         IEnumerable<SegmentItemViewModel> segments)
     {
@@ -62,13 +54,10 @@ public partial class MeetingDetailViewModel : ViewModelBase
         _language = language;
         _onTitleSaved = onTitleSaved;
         _transcriptText = transcriptText;
-        _originalTranscriptText = originalTranscriptText;
+        _speakersText = speakersText;
         _summaryText = summaryText;
         foreach (var s in segments) Segments.Add(s);
     }
-
-    [RelayCommand]
-    private void ToggleOriginalTranscript() => ShowOriginalTranscript = !ShowOriginalTranscript;
 
     [RelayCommand]
     private async Task SaveTitleAsync(string? newTitle)
@@ -107,7 +96,12 @@ public partial class MeetingDetailViewModel : ViewModelBase
 
             if (transcript != null)
             {
-                transcript.FullText = TranscriptText;
+                // If speaker ID has been run, original is in OriginalFullText; save there.
+                // Otherwise save to FullText directly.
+                if (!string.IsNullOrEmpty(transcript.OriginalFullText))
+                    transcript.OriginalFullText = TranscriptText;
+                else
+                    transcript.FullText = TranscriptText;
                 await db.SaveChangesAsync();
                 StatusMessage = "Transcript saved";
             }
@@ -134,13 +128,44 @@ public partial class MeetingDetailViewModel : ViewModelBase
     [RelayCommand]
     private async Task CopyTranscriptAsync()
     {
-        var text = ShowOriginalTranscript ? OriginalTranscriptText : TranscriptText;
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrEmpty(TranscriptText)) return;
         var clipboard = GetClipboard();
         if (clipboard != null)
         {
-            await clipboard.SetTextAsync(text);
+            await clipboard.SetTextAsync(TranscriptText);
             StatusMessage = "Transcript copied to clipboard";
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopySpeakersAsync()
+    {
+        if (string.IsNullOrEmpty(SpeakersText)) return;
+        var clipboard = GetClipboard();
+        if (clipboard != null)
+        {
+            await clipboard.SetTextAsync(SpeakersText);
+            StatusMessage = "Speaker transcript copied to clipboard";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportSpeakersAsync()
+    {
+        if (string.IsNullOrEmpty(SpeakersText)) return;
+        try
+        {
+            var destPath = await ShowSaveDialogAsync("Speakers.txt", "txt", "Text files", ["*.txt", "*.md"]);
+            if (destPath != null)
+            {
+                await File.WriteAllTextAsync(destPath, SpeakersText);
+                StatusMessage = $"Speaker transcript exported to {Path.GetFileName(destPath)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to export speaker transcript for {Id}", _meetingId);
+            StatusMessage = $"Export failed: {ex.Message}";
         }
     }
 

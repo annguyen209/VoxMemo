@@ -384,12 +384,20 @@ public partial class MeetingItemViewModel : ViewModelBase
         HasSummary = meeting.Summaries.Count > 0;
 
         string transcriptText = string.Empty;
-        string originalTranscriptText = string.Empty;
+        string speakersText = string.Empty;
         if (HasTranscript)
         {
             var t = meeting.Transcripts.OrderByDescending(t => t.CreatedAt).First();
-            transcriptText = t.FullText ?? string.Empty;
-            originalTranscriptText = t.OriginalFullText ?? string.Empty;
+            // If speaker ID has been run: OriginalFullText = original, FullText = speaker text
+            if (!string.IsNullOrEmpty(t.OriginalFullText))
+            {
+                transcriptText = t.OriginalFullText;
+                speakersText = t.FullText ?? string.Empty;
+            }
+            else
+            {
+                transcriptText = t.FullText ?? string.Empty;
+            }
         }
 
         string summaryText = HasSummary ? meeting.Summaries.First().Content : string.Empty;
@@ -409,7 +417,7 @@ public partial class MeetingItemViewModel : ViewModelBase
             language: _language,
             onTitleSaved: newTitle => Title = newTitle,
             transcriptText: transcriptText,
-            originalTranscriptText: originalTranscriptText,
+            speakersText: speakersText,
             summaryText: summaryText,
             segments: segments);
 

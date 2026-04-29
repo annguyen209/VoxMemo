@@ -289,14 +289,7 @@
                                     <DockPanel Margin="0,12">
                                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
                                                     HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
-                                            <Button Command="{Binding Detail.ToggleOriginalTranscriptCommand}"
-                                                    IsVisible="{Binding Detail.HasOriginalTranscript}"
-                                                    Background="#45475a" Foreground="#cdd6f4"
-                                                    CornerRadius="6" Padding="12,5" FontSize="12">
-                                                <TextBlock Text="{Binding Detail.TranscriptViewLabel}"/>
-                                            </Button>
                                             <Button Command="{Binding Detail.SaveTranscriptCommand}"
-                                                    IsVisible="{Binding !Detail.ShowOriginalTranscript}"
                                                     Background="#cba6f7" Foreground="#1e1e2e"
                                                     CornerRadius="6" Padding="12,5" FontSize="12"
                                                     FontWeight="SemiBold">
@@ -308,27 +301,43 @@
                                                 <TextBlock Text="Copy"/>
                                             </Button>
                                             <Button Command="{Binding Detail.ExportTranscriptCommand}"
-                                                    IsVisible="{Binding !Detail.ShowOriginalTranscript}"
                                                     Background="#313244" Foreground="#bac2de"
                                                     CornerRadius="6" Padding="12,5" FontSize="12">
                                                 <TextBlock Text="Export"/>
                                             </Button>
                                         </StackPanel>
-                                        <TextBox Text="{Binding Detail.OriginalTranscriptText}"
-                                                 IsVisible="{Binding Detail.ShowOriginalTranscript}"
-                                                 IsReadOnly="True"
-                                                 AcceptsReturn="True"
-                                                 TextWrapping="Wrap"
-                                                 Background="#1e1e2e" Foreground="#a6adc8"
-                                                 CornerRadius="8" Padding="16"
-                                                 MinHeight="250"/>
                                         <TextBox Text="{Binding Detail.TranscriptText}"
-                                                 IsVisible="{Binding !Detail.ShowOriginalTranscript}"
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
                                                  Background="#1e1e2e" Foreground="#cdd6f4"
                                                  CornerRadius="8" Padding="16"
                                                  Watermark="No transcript yet. Click 'Transcribe' to generate one."
+                                                 MinHeight="250"/>
+                                    </DockPanel>
+                                </TabItem>
+
+                                <TabItem Header="Speakers" IsVisible="{Binding Detail.HasSpeakers}">
+                                    <DockPanel Margin="0,12">
+                                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                                    HorizontalAlignment="Right" Spacing="4" Margin="0,0,0,8">
+                                            <Button Command="{Binding Detail.CopySpeakersCommand}"
+                                                    Background="#313244" Foreground="#bac2de"
+                                                    CornerRadius="6" Padding="12,5" FontSize="12">
+                                                <TextBlock Text="Copy"/>
+                                            </Button>
+                                            <Button Command="{Binding Detail.ExportSpeakersCommand}"
+                                                    Background="#313244" Foreground="#bac2de"
+                                                    CornerRadius="6" Padding="12,5" FontSize="12">
+                                                <TextBlock Text="Export"/>
+                                            </Button>
+                                        </StackPanel>
+                                        <TextBox Text="{Binding Detail.SpeakersText}"
+                                                 IsReadOnly="True"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 Background="#1e1e2e" Foreground="#f9e2af"
+                                                 CornerRadius="8" Padding="16"
+                                                 Watermark="No speaker identification yet. Click 'Identify Speakers' to label dialog."
                                                  MinHeight="250"/>
                                     </DockPanel>
                                 </TabItem>
