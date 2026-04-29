@@ -19,7 +19,7 @@ public static class PromptTemplates
         {
             try
             {
-                using var db = new AppDbContext();
+                using var db = AppDbContextFactory.Create();
                 var setting = db.AppSettings.FirstOrDefault(s => s.Key == customKey);
                 if (setting != null && !string.IsNullOrWhiteSpace(setting.Value))
                 {
