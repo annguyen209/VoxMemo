@@ -287,62 +287,25 @@ public partial class MeetingDetailViewModel : ViewModelBase
             || desktop.MainWindow == null)
             return;
 
-        // SmartProcessDialog will exist after Task 9. For now, inline the dialog inline temporarily
-        // and leave a TODO so Task 9 can wire it up. We preserve existing behavior.
-        var doTranscribe = savedSteps.Contains('t');
-        var doSpeakers = savedSteps.Contains('s');
-        var doSummarize = savedSteps.Contains('m');
-        var dontAskAgain = false;
-        var confirmed = false;
+        var processDialog = new VoxMemo.Views.Dialogs.SmartProcessDialog(savedSteps);
+        await processDialog.ShowDialog(desktop.MainWindow);
+        if (processDialog.Options == null) return;
 
-        var dialog = new Avalonia.Controls.Window
-        {
-            Title = "Smart Process",
-            Width = 420,
-            SizeToContent = Avalonia.Controls.SizeToContent.Height,
-            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-        };
+        var opts = processDialog.Options;
+        var steps = $"{(opts.Transcribe ? "t" : "")}{(opts.Speakers ? "s" : "")}{(opts.Summarize ? "m" : "")}";
 
-        var content = new Avalonia.Controls.StackPanel { Margin = new Avalonia.Thickness(28, 24), Spacing = 16 };
-        content.Children.Add(new Avalonia.Controls.TextBlock { Text = "Select processing steps:", FontSize = 14, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4") });
-
-        var chkTranscribe = new Avalonia.Controls.CheckBox { IsChecked = doTranscribe, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"), Content = new Avalonia.Controls.TextBlock { Text = "1. Transcribe audio", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#89b4fa") } };
-        var chkSpeakers = new Avalonia.Controls.CheckBox { IsChecked = doSpeakers, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"), Content = new Avalonia.Controls.TextBlock { Text = "2. Identify speakers", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#f9e2af") } };
-        var chkSummarize = new Avalonia.Controls.CheckBox { IsChecked = doSummarize, Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"), Content = new Avalonia.Controls.TextBlock { Text = "3. Summarize with AI", FontSize = 13, Foreground = Avalonia.Media.Brush.Parse("#a6e3a1") } };
-        var chkDontAsk = new Avalonia.Controls.CheckBox { IsChecked = false, Foreground = Avalonia.Media.Brush.Parse("#7f849c"), Content = new Avalonia.Controls.TextBlock { Text = "Don't ask again (reset in Settings)", FontSize = 12 } };
-
-        content.Children.Add(chkTranscribe);
-        content.Children.Add(chkSpeakers);
-        content.Children.Add(chkSummarize);
-        content.Children.Add(new Avalonia.Controls.Border { Height = 1, Background = Avalonia.Media.Brush.Parse("#313244") });
-        content.Children.Add(chkDontAsk);
-
-        var buttons = new Avalonia.Controls.StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
-        var cancelBtn = new Avalonia.Controls.Button { Content = "Cancel", Background = Avalonia.Media.Brush.Parse("#313244"), Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"), Padding = new Avalonia.Thickness(24, 10), CornerRadius = new Avalonia.CornerRadius(8), FontSize = 13 };
-        cancelBtn.Click += (_, _) => dialog.Close();
-        var startBtn = new Avalonia.Controls.Button { Content = "Start Processing", Background = Avalonia.Media.Brush.Parse("#cba6f7"), Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"), Padding = new Avalonia.Thickness(24, 10), CornerRadius = new Avalonia.CornerRadius(8), FontSize = 13, FontWeight = Avalonia.Media.FontWeight.SemiBold };
-        startBtn.Click += (_, _) => { doTranscribe = chkTranscribe.IsChecked == true; doSpeakers = chkSpeakers.IsChecked == true; doSummarize = chkSummarize.IsChecked == true; dontAskAgain = chkDontAsk.IsChecked == true; confirmed = true; dialog.Close(); };
-        buttons.Children.Add(cancelBtn);
-        buttons.Children.Add(startBtn);
-        content.Children.Add(buttons);
-        dialog.Content = content;
-
-        await dialog.ShowDialog(desktop.MainWindow);
-        if (!confirmed) return;
-
-        var steps = $"{(doTranscribe ? "t" : "")}{(doSpeakers ? "s" : "")}{(doSummarize ? "m" : "")}";
-        if (dontAskAgain)
+        if (opts.DontAskAgain)
         {
             try
             {
-                await using var db = AppDbContextFactory.Create();
-                var s1 = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
-                if (s1 != null) s1.Value = "true"; else db.AppSettings.Add(new AppSettings { Key = "smart_process_skip_dialog", Value = "true" });
-                var s2 = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
-                if (s2 != null) s2.Value = steps; else db.AppSettings.Add(new AppSettings { Key = "smart_process_steps", Value = steps });
-                await db.SaveChangesAsync();
+                await using var db2 = AppDbContextFactory.Create();
+                var s1 = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_skip_dialog");
+                if (s1 != null) s1.Value = "true";
+                else db2.AppSettings.Add(new VoxMemo.Models.AppSettings { Key = "smart_process_skip_dialog", Value = "true" });
+                var s2 = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "smart_process_steps");
+                if (s2 != null) s2.Value = steps;
+                else db2.AppSettings.Add(new VoxMemo.Models.AppSettings { Key = "smart_process_steps", Value = steps });
+                await db2.SaveChangesAsync();
             }
             catch (Exception ex) { Log.Error(ex, "Failed to save smart process preferences"); }
         }

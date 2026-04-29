@@ -309,8 +309,16 @@ public partial class MainWindowViewModel : ViewModelBase
                      if (hasExisting)
                      {
                          // Must show dialog on UI thread
-                         var shouldOverwrite = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
-                             ShowTranscriptOverwriteDialogAsync());
+                         var shouldOverwrite = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                         {
+                             if (Avalonia.Application.Current?.ApplicationLifetime
+                                 is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                                 || desktop.MainWindow == null)
+                                 return true;
+                             var dlg = new VoxMemo.Views.Dialogs.TranscriptOverwriteDialog();
+                             await dlg.ShowDialog(desktop.MainWindow);
+                             return dlg.ShouldOverwrite;
+                         });
                          if (!shouldOverwrite)
                          {
                              // User chose to skip - mark as complete without processing
@@ -729,96 +737,6 @@ public partial class MainWindowViewModel : ViewModelBase
              Log.Error(ex, "Error checking for existing transcript for {MeetingId}", meetingId);
              return false;
          }
-     }
-
-     /// <summary>Shows a dialog asking user to overwrite or skip existing transcript.</summary>
-     private static async Task<bool> ShowTranscriptOverwriteDialogAsync()
-     {
-         if (Avalonia.Application.Current?.ApplicationLifetime
-             is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-             || desktop.MainWindow == null)
-             return true; // Default to overwrite if can't show dialog
-
-         var shouldOverwrite = false;
-         var dialog = new Avalonia.Controls.Window
-         {
-             Title = "Transcript Already Exists",
-             Width = 440,
-             SizeToContent = Avalonia.Controls.SizeToContent.Height,
-             WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-             CanResize = false,
-             Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-             ExtendClientAreaToDecorationsHint = false,
-         };
-
-         var root = new Avalonia.Controls.Border
-         {
-             Padding = new Avalonia.Thickness(28, 24),
-             Child = new Avalonia.Controls.StackPanel
-             {
-                 Spacing = 20,
-             }
-         };
-
-         var contentPanel = (Avalonia.Controls.StackPanel)root.Child;
-
-         // Message
-         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-         {
-             Text = "This meeting already has a transcript.",
-             FontSize = 14,
-             Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-         });
-
-         // Detail
-         contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-         {
-             Text = "Would you like to overwrite it with a new transcription, or keep the existing one?",
-             FontSize = 12,
-             Foreground = Avalonia.Media.Brush.Parse("#7f849c"),
-             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-         });
-
-         // Buttons
-         var buttonPanel = new Avalonia.Controls.StackPanel
-         {
-             Orientation = Avalonia.Layout.Orientation.Horizontal,
-             Spacing = 10,
-             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-             Margin = new Avalonia.Thickness(0, 4, 0, 0),
-         };
-
-         var skipBtn = new Avalonia.Controls.Button
-         {
-             Content = "Keep Existing",
-             Background = Avalonia.Media.Brush.Parse("#313244"),
-             Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-             Padding = new Avalonia.Thickness(24, 10),
-             CornerRadius = new Avalonia.CornerRadius(8),
-             FontSize = 13,
-         };
-         skipBtn.Click += (_, _) => { shouldOverwrite = false; dialog.Close(); };
-
-         var overwriteBtn = new Avalonia.Controls.Button
-         {
-             Content = "Overwrite",
-             Background = Avalonia.Media.Brush.Parse("#a6e3a1"),
-             Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
-             Padding = new Avalonia.Thickness(24, 10),
-             CornerRadius = new Avalonia.CornerRadius(8),
-             FontSize = 13,
-             FontWeight = Avalonia.Media.FontWeight.SemiBold,
-         };
-         overwriteBtn.Click += (_, _) => { shouldOverwrite = true; dialog.Close(); };
-
-         buttonPanel.Children.Add(skipBtn);
-         buttonPanel.Children.Add(overwriteBtn);
-         contentPanel.Children.Add(buttonPanel);
-
-         dialog.Content = root;
-         await dialog.ShowDialog(desktop.MainWindow);
-         return shouldOverwrite;
      }
 
      /// <summary>Determines if an error is transient and worth retrying.</summary>

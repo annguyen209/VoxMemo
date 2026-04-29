@@ -112,99 +112,6 @@ public partial class MeetingsViewModel : ViewModelBase
         }
     }
 
-    private static async Task<bool> ConfirmDialogAsync(
-        string title, string message, string? detail, string confirmText, string confirmColor)
-    {
-        if (Avalonia.Application.Current?.ApplicationLifetime
-            is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-            || desktop.MainWindow == null)
-            return true;
-
-        var confirmed = false;
-        var dialog = new Avalonia.Controls.Window
-        {
-            Title = title,
-            Width = 440,
-            SizeToContent = Avalonia.Controls.SizeToContent.Height,
-            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-            ExtendClientAreaToDecorationsHint = false,
-        };
-
-        var root = new Avalonia.Controls.Border
-        {
-            Padding = new Avalonia.Thickness(28, 24),
-            Child = new Avalonia.Controls.StackPanel
-            {
-                Spacing = 20,
-            }
-        };
-
-        var contentPanel = (Avalonia.Controls.StackPanel)root.Child;
-
-        // Message
-        contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = message,
-            FontSize = 14,
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-        });
-
-        // Detail (optional)
-        if (!string.IsNullOrEmpty(detail))
-        {
-            contentPanel.Children.Add(new Avalonia.Controls.TextBlock
-            {
-                Text = detail,
-                FontSize = 12,
-                Foreground = Avalonia.Media.Brush.Parse("#7f849c"),
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            });
-        }
-
-        // Buttons
-        var buttonPanel = new Avalonia.Controls.StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 10,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Margin = new Avalonia.Thickness(0, 4, 0, 0),
-        };
-
-        var cancelBtn = new Avalonia.Controls.Button
-        {
-            Content = "Cancel",
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-        };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        var confirmBtn = new Avalonia.Controls.Button
-        {
-            Content = confirmText,
-            Background = Avalonia.Media.Brush.Parse(confirmColor),
-            Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-        };
-        confirmBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
-
-        buttonPanel.Children.Add(cancelBtn);
-        buttonPanel.Children.Add(confirmBtn);
-        contentPanel.Children.Add(buttonPanel);
-
-        dialog.Content = root;
-        await dialog.ShowDialog(desktop.MainWindow);
-        return confirmed;
-    }
-
     [RelayCommand]
     private async Task CreateFromTextAsync()
     {
@@ -213,224 +120,55 @@ public partial class MeetingsViewModel : ViewModelBase
             || desktop.MainWindow == null)
             return;
 
-        // Show dialog with title + text area
-        var confirmed = false;
-        string title = "";
-        string transcript = "";
         string language = "en";
-
-        var dialog = new Avalonia.Controls.Window
-        {
-            Title = "New Meeting from Text",
-            Width = 550,
-            Height = 550,
-            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            CanResize = true,
-            Background = Avalonia.Media.Brush.Parse("#1e1e2e"),
-        };
-
-        // Read default language
-        try
-        {
-            await using var db2 = AppDbContextFactory.Create();
-            var langSetting = await db2.AppSettings.FirstOrDefaultAsync(s => s.Key == "default_language");
-            if (langSetting != null) language = langSetting.Value;
-        }
-        catch { }
-
-        // Load enabled languages
         List<string> languages = ["en", "vi"];
         try
         {
-            await using var db3 = AppDbContextFactory.Create();
-            var langListSetting = await db3.AppSettings.FirstOrDefaultAsync(s => s.Key == "enabled_languages");
+            await using var db = AppDbContextFactory.Create();
+            var langSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "default_language");
+            if (langSetting != null) language = langSetting.Value;
+            var langListSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "enabled_languages");
             if (langListSetting != null && !string.IsNullOrEmpty(langListSetting.Value))
                 languages = langListSetting.Value.Split(',').ToList();
         }
-        catch { }
-
-        var content = new Avalonia.Controls.DockPanel
+        catch (Exception ex)
         {
-            Margin = new Avalonia.Thickness(24, 20),
-        };
+            Serilog.Log.Error(ex, "Failed to load language settings for CreateFromText");
+        }
 
-        // Top fields
-        var topFields = new Avalonia.Controls.StackPanel { Spacing = 10 };
-        Avalonia.Controls.DockPanel.SetDock(topFields, Avalonia.Controls.Dock.Top);
-
-        topFields.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = "Title", FontSize = 12,
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-        });
-        var titleBox = new Avalonia.Controls.TextBox
-        {
-            Watermark = "Meeting title...",
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            CornerRadius = new Avalonia.CornerRadius(6),
-            Padding = new Avalonia.Thickness(12, 8),
-        };
-        topFields.Children.Add(titleBox);
-
-        topFields.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = "Language", FontSize = 12,
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-        });
-        var langCombo = new Avalonia.Controls.ComboBox
-        {
-            ItemsSource = languages,
-            SelectedItem = language,
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            CornerRadius = new Avalonia.CornerRadius(6),
-            Padding = new Avalonia.Thickness(10, 6),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
-            MinWidth = 100,
-        };
-        topFields.Children.Add(langCombo);
-        content.Children.Add(topFields);
-
-        // Transcript textbox — fills remaining space
-        var textBox = new Avalonia.Controls.TextBox
-        {
-            Watermark = "Paste or type the transcript here...",
-            AcceptsReturn = true,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            CornerRadius = new Avalonia.CornerRadius(6),
-            Padding = new Avalonia.Thickness(12, 8),
-            Margin = new Avalonia.Thickness(0, 10, 0, 0),
-        };
-        // Import from file button
-        var importBtn = new Avalonia.Controls.Button
-        {
-            Content = "Import from File",
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-            Padding = new Avalonia.Thickness(12, 6),
-            CornerRadius = new Avalonia.CornerRadius(6),
-            FontSize = 12,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
-        };
-        importBtn.Click += async (_, _) =>
-        {
-            var files = await desktop.MainWindow.StorageProvider.OpenFilePickerAsync(
-                new Avalonia.Platform.Storage.FilePickerOpenOptions
-                {
-                    Title = "Select text file",
-                    AllowMultiple = false,
-                    FileTypeFilter =
-                    [
-                        new Avalonia.Platform.Storage.FilePickerFileType("Text files")
-                        {
-                            Patterns = ["*.txt", "*.md", "*.srt", "*.vtt", "*.csv", "*.log"]
-                        }
-                    ]
-                });
-            if (files.Count > 0)
-            {
-                var filePath = files[0].Path.LocalPath;
-                textBox.Text = await System.IO.File.ReadAllTextAsync(filePath);
-                if (string.IsNullOrWhiteSpace(titleBox.Text))
-                    titleBox.Text = System.IO.Path.GetFileNameWithoutExtension(filePath);
-            }
-        };
-
-        var textRow = new Avalonia.Controls.DockPanel { Margin = new Avalonia.Thickness(0, 10, 0, 0) };
-        textRow.Children.Add(new Avalonia.Controls.TextBlock
-        {
-            Text = "Transcript", FontSize = 12,
-            Foreground = Avalonia.Media.Brush.Parse("#bac2de"),
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-        });
-        Avalonia.Controls.DockPanel.SetDock(importBtn, Avalonia.Controls.Dock.Right);
-        textRow.Children.Add(importBtn);
-        Avalonia.Controls.DockPanel.SetDock(textRow, Avalonia.Controls.Dock.Top);
-        content.Children.Add(textRow);
-
-        // Buttons docked to bottom
-        var buttons = new Avalonia.Controls.StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 10,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Margin = new Avalonia.Thickness(0, 4, 0, 0),
-        };
-
-        var cancelBtn = new Avalonia.Controls.Button
-        {
-            Content = "Cancel",
-            Background = Avalonia.Media.Brush.Parse("#313244"),
-            Foreground = Avalonia.Media.Brush.Parse("#cdd6f4"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-        };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        var createBtn = new Avalonia.Controls.Button
-        {
-            Content = "Create Meeting",
-            Background = Avalonia.Media.Brush.Parse("#89b4fa"),
-            Foreground = Avalonia.Media.Brush.Parse("#1e1e2e"),
-            Padding = new Avalonia.Thickness(24, 10),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            FontSize = 13,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-        };
-        createBtn.Click += (_, _) =>
-        {
-            title = titleBox.Text ?? "";
-            transcript = textBox.Text ?? "";
-            language = langCombo.SelectedItem?.ToString() ?? "en";
-            confirmed = true;
-            dialog.Close();
-        };
-
-        buttons.Children.Add(cancelBtn);
-        buttons.Children.Add(createBtn);
-        Avalonia.Controls.DockPanel.SetDock(buttons, Avalonia.Controls.Dock.Bottom);
-        content.Children.Add(buttons);
-
-        // Textbox fills remaining space (added last in DockPanel)
-        content.Children.Add(textBox);
-
-        dialog.Content = content;
-
+        var dialog = new VoxMemo.Views.Dialogs.CreateFromTextDialog(language, languages);
         await dialog.ShowDialog(desktop.MainWindow);
-        if (!confirmed || string.IsNullOrWhiteSpace(transcript)) return;
+        if (dialog.Result == null) return;
 
-        if (string.IsNullOrWhiteSpace(title))
-            title = $"Text Import {DateTime.Now:MMM dd, yyyy HH:mm}";
-
-        // Save meeting + transcript to DB
-        var meeting = new Meeting
+        var r = dialog.Result;
+        var meeting = new VoxMemo.Models.Meeting
         {
-            Title = title,
+            Title = r.Title,
             Platform = "Text Import",
             StartedAt = DateTime.UtcNow,
             EndedAt = DateTime.UtcNow,
-            Language = language,
+            Language = r.Language,
         };
 
-        await using var dbSave = AppDbContextFactory.Create();
-        dbSave.Meetings.Add(meeting);
-
-        dbSave.Transcripts.Add(new Transcript
+        try
         {
-            MeetingId = meeting.Id,
-            Engine = "manual",
-            Language = language,
-            FullText = transcript,
-        });
-
-        await dbSave.SaveChangesAsync();
-
-        await LoadMeetingsAsync();
-        SelectedMeeting = Meetings.FirstOrDefault(m => m.Id == meeting.Id);
+            await using var dbSave = AppDbContextFactory.Create();
+            dbSave.Meetings.Add(meeting);
+            dbSave.Transcripts.Add(new VoxMemo.Models.Transcript
+            {
+                MeetingId = meeting.Id,
+                Engine = "manual",
+                Language = r.Language,
+                FullText = r.Transcript,
+            });
+            await dbSave.SaveChangesAsync();
+            await LoadMeetingsAsync();
+            SelectedMeeting = Meetings.FirstOrDefault(m => m.Id == meeting.Id);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to save text-import meeting");
+        }
     }
 
     [RelayCommand]
@@ -547,22 +285,35 @@ public partial class MeetingsViewModel : ViewModelBase
     {
         if (meeting == null) return;
 
-        if (!await ConfirmDialogAsync(
+        if (Avalonia.Application.Current?.ApplicationLifetime
+            is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow == null)
+            return;
+
+        var dialog = new VoxMemo.Views.Dialogs.ConfirmDialog(
             "Delete Meeting",
             $"Are you sure you want to delete \"{meeting.Title}\"?",
-            "This action cannot be undone. The recording file will remain on disk.",
-            "Delete", "#f38ba8"))
-            return;
+            "Delete", "#f38ba8",
+            "This action cannot be undone. The recording file will remain on disk.");
+        await dialog.ShowDialog(desktop.MainWindow);
+        if (!dialog.Confirmed) return;
 
         // Cancel and remove any jobs for this meeting
         MeetingItemViewModel.RaiseMeetingDeleted(meeting.Id);
 
-        await using var db = AppDbContextFactory.Create();
-        var entity = await db.Meetings.FindAsync(meeting.Id);
-        if (entity != null)
+        try
         {
-            db.Meetings.Remove(entity);
-            await db.SaveChangesAsync();
+            await using var db = AppDbContextFactory.Create();
+            var entity = await db.Meetings.FindAsync(meeting.Id);
+            if (entity != null)
+            {
+                db.Meetings.Remove(entity);
+                await db.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to delete meeting {Id}", meeting.Id);
         }
 
         Meetings.Remove(meeting);
