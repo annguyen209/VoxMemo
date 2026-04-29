@@ -1,0 +1,44 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="VoxMemo.Views.Dialogs.CreateFromTextDialog"
+        Title="New Meeting from Text"
+        Width="550" Height="550"
+        WindowStartupLocation="CenterOwner" CanResize="True"
+        Background="#1e1e2e">
+    <DockPanel Margin="24,20">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10"
+                    HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Click="OnCancel"
+                    Background="#313244" Foreground="#cdd6f4"
+                    Padding="24,10" CornerRadius="8" FontSize="13"/>
+            <Button Content="Create Meeting" Click="OnCreate"
+                    Background="#89b4fa" Foreground="#1e1e2e"
+                    Padding="24,10" CornerRadius="8" FontSize="13" FontWeight="SemiBold"/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Top" Spacing="10">
+            <TextBlock Text="Title" FontSize="12" Foreground="#bac2de"/>
+            <TextBox x:Name="TitleBox" Watermark="Meeting title..."
+                     Background="#313244" Foreground="#cdd6f4"
+                     CornerRadius="6" Padding="12,8"/>
+            <TextBlock Text="Language" FontSize="12" Foreground="#bac2de"/>
+            <ComboBox x:Name="LangCombo"
+                      Background="#313244" Foreground="#cdd6f4"
+                      CornerRadius="6" Padding="10,6"
+                      HorizontalAlignment="Left" MinWidth="100"/>
+            <DockPanel>
+                <TextBlock Text="Transcript" FontSize="12" Foreground="#bac2de"
+                           VerticalAlignment="Center"/>
+                <Button DockPanel.Dock="Right" Content="Import from File"
+                        Click="OnImportFile"
+                        Background="#313244" Foreground="#bac2de"
+                        Padding="12,6" CornerRadius="6" FontSize="12"
+                        HorizontalAlignment="Right"/>
+            </DockPanel>
+        </StackPanel>
+        <TextBox x:Name="TranscriptBox"
+                 Watermark="Paste or type the transcript here..."
+                 AcceptsReturn="True" TextWrapping="Wrap"
+                 Background="#313244" Foreground="#cdd6f4"
+                 CornerRadius="6" Padding="12,8" Margin="0,10,0,0"/>
+    </DockPanel>
+</Window>

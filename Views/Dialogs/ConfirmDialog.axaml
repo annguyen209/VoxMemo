@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="VoxMemo.Views.Dialogs.ConfirmDialog"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="#1e1e2e" ExtendClientAreaToDecorationsHint="False">
+    <Border Padding="28,24">
+        <StackPanel Spacing="20">
+            <TextBlock x:Name="MessageText" FontSize="14"
+                       Foreground="#bac2de" TextWrapping="Wrap"/>
+            <TextBlock x:Name="DetailText" FontSize="12"
+                       Foreground="#7f849c" TextWrapping="Wrap"
+                       IsVisible="False"/>
+            <StackPanel Orientation="Horizontal" Spacing="10"
+                        HorizontalAlignment="Right" Margin="0,4,0,0">
+                <Button Content="Cancel" Click="OnCancel"
+                        Background="#313244" Foreground="#cdd6f4"
+                        Padding="24,10" CornerRadius="8" FontSize="13"/>
+                <Button x:Name="ConfirmButton" Click="OnConfirm"
+                        Foreground="#1e1e2e" Padding="24,10"
+                        CornerRadius="8" FontSize="13" FontWeight="SemiBold"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
