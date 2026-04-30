@@ -92,17 +92,37 @@ public partial class App : Application
         }
         SetTheme(savedTheme);
 
+        // Check if first-run onboarding is needed
+        bool needsOnboarding = false;
+        try
+        {
+            await using var onbDb = AppDbContextFactory.Create();
+            var onbSetting = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .FirstOrDefaultAsync(onbDb.AppSettings, s => s.Key == "onboarding_complete");
+            needsOnboarding = onbSetting?.Value != "true";
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to check onboarding_complete, skipping wizard");
+        }
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Log.Information("Setting up main window");
             DisableAvaloniaDataAnnotationValidation();
             _mainVm = new MainWindowViewModel();
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = _mainVm,
-            };
+            var mainWindow = new MainWindow { DataContext = _mainVm };
+            desktop.MainWindow = mainWindow;
 
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            if (needsOnboarding)
+            {
+                mainWindow.IsVisible = false;
+                var onboarding = new VoxMemo.Views.OnboardingWindow();
+                onboarding.Closed += (_, _) => mainWindow.IsVisible = true;
+                onboarding.Show();
+            }
 
             // Only rebuild when tray-visible state actually changes.
             _mainVm.Recording.PropertyChanged += (_, e) =>
@@ -123,8 +143,8 @@ public partial class App : Application
 
             desktop.ShutdownRequested += (_, _) =>
             {
-                if (desktop.MainWindow is MainWindow mainWindow)
-                    mainWindow.PrepareForExit();
+                if (desktop.MainWindow is MainWindow mw)
+                    mw.PrepareForExit();
                 Services.Platform.PlatformServices.GlobalHotkey.Dispose();
             };
         }
