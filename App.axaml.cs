@@ -140,6 +140,18 @@ public partial class App : Application
             // Rebuild when enabled languages change
             SettingsViewModel.EnabledLanguagesChanged += (_, _) => RebuildTrayMenu();
 
+            // Re-run onboarding wizard from Settings
+            SettingsViewModel.RerunOnboardingRequested += (_, _) =>
+            {
+                var onb = new VoxMemo.Views.OnboardingWindow();
+                onb.Closed += (_, _) =>
+                {
+                    _ = _mainVm.Settings.LoadSettingsCommand.ExecuteAsync(null);
+                    _mainVm.Recording.RefreshDevicesCommand.Execute(null);
+                };
+                onb.Show();
+            };
+
             // Build initial menu
             RebuildTrayMenu();
 

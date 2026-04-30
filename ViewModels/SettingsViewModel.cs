@@ -603,6 +603,27 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Raised when the user wants to re-run the onboarding wizard.</summary>
+    public static event EventHandler? RerunOnboardingRequested;
+
+    [RelayCommand]
+    private async Task RerunOnboardingAsync()
+    {
+        try
+        {
+            await using var db = AppDbContextFactory.Create();
+            var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == "onboarding_complete");
+            if (setting != null) db.AppSettings.Remove(setting);
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to reset onboarding: {ex.Message}";
+            return;
+        }
+        RerunOnboardingRequested?.Invoke(this, EventArgs.Empty);
+    }
+
 }
 
 public record PromptTemplate(string Name, string Prompt)
