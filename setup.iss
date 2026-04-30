@@ -1,8 +1,8 @@
 [Setup]
 AppName=VoxMemo
 AppVersion=1.5.0
-AppPublisher=Anzdev4life
-AppPublisherURL=https://github.com/annguyen209/VoxMemo
+AppPublisher=AnsCodeLab
+AppPublisherURL=https://github.com/AnsCodeLab/VoxMemo
 DefaultDirName={autopf}\VoxMemo
 DefaultGroupName=VoxMemo
 OutputDir=publish
@@ -20,9 +20,9 @@ Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdi
 
 [Icons]
 ; Start Menu shortcut with AppUserModelID for modern toast notifications
-Name: "{group}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; AppUserModelID: "Anzdev4life.VoxMemo"
+Name: "{group}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; AppUserModelID: "AnsCodeLab.VoxMemo"
 Name: "{group}\Uninstall VoxMemo"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; Tasks: desktopicon; AppUserModelID: "Anzdev4life.VoxMemo"
+Name: "{autodesktop}\VoxMemo"; Filename: "{app}\VoxMemo.exe"; Tasks: desktopicon; AppUserModelID: "AnsCodeLab.VoxMemo"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
