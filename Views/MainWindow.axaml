@@ -10,7 +10,8 @@
         Icon="/Assets/voxmemo-icon.ico"
         Title="VoxMemo - Meeting Recorder"
         Width="1100" Height="700"
-        MinWidth="800" MinHeight="500">
+        MinWidth="800" MinHeight="500"
+        WindowState="Maximized">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
