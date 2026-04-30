@@ -43,27 +43,41 @@ public class WhisperTranscriptionService : ITranscriptionService
         var baseDir = AppContext.BaseDirectory;
         var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
 
-        // Search for native lib directories
-        string[] candidates = [
-            Path.Combine(baseDir, "runtimes", rid),
-            Path.Combine(baseDir, "runtimes", rid, "native"),
-            // Vulkan runtime paths
-            Path.Combine(baseDir, "runtimes", "vulkan", rid),
-            .. new[] { "win-x64", "win-arm64", "linux-x64", "osx-x64", "osx-arm64" }
-                .SelectMany(r => new[] {
-                    Path.Combine(baseDir, "runtimes", r),
-                    Path.Combine(baseDir, "runtimes", "vulkan", r),
-                })
-        ];
+        // Only search for libs that match the current platform — never copy Linux .so on Windows etc.
+        string[] platformExts;
+        string[] platformRids;
+        if (OperatingSystem.IsWindows())
+        {
+            platformExts = ["*.dll"];
+            platformRids = ["win-x64", "win-arm64", "win-x86"];
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            platformExts = ["*.so"];
+            platformRids = ["linux-x64", "linux-arm64"];
+        }
+        else
+        {
+            platformExts = ["*.dylib"];
+            platformRids = ["osx-arm64", "osx-x64"];
+        }
+
+        // Prefer exact RID first, then generic platform RIDs; check /native subdir before parent
+        var candidateRids = new[] { rid }.Concat(platformRids).Distinct();
+        var candidates = candidateRids.SelectMany(r => new[]
+        {
+            Path.Combine(baseDir, "runtimes", r, "native"),
+            Path.Combine(baseDir, "runtimes", r),
+        });
 
         foreach (var dir in candidates)
         {
             if (!Directory.Exists(dir)) continue;
 
-            // Copy native libs to app base directory so Whisper.net can find them
-            foreach (var file in Directory.GetFiles(dir, "*.dll")
-                .Concat(Directory.GetFiles(dir, "*.so"))
-                .Concat(Directory.GetFiles(dir, "*.dylib")))
+            var files = platformExts.SelectMany(ext => Directory.GetFiles(dir, ext)).ToArray();
+            if (files.Length == 0) continue;
+
+            foreach (var file in files)
             {
                 var dest = Path.Combine(baseDir, Path.GetFileName(file));
                 if (!File.Exists(dest))

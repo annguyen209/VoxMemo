@@ -20,7 +20,6 @@ for RID in "${RIDS[@]}"; do
 
     dotnet publish -c Release -r "$RID" --self-contained \
         -p:PublishSingleFile=true \
-        -p:IncludeNativeLibrariesForSelfExtract=true \
         -o "$PUBLISH_DIR/$RID"
 
     echo "--- Packaging $NAME ---"
