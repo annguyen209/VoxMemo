@@ -189,12 +189,13 @@
     <Border Grid.Row="2" Background="#11111b" Padding="12,6">
         <DockPanel>
             <TextBlock DockPanel.Dock="Right"
-                       Text="Anzdev4life"
+                       Text="AnsCodeLab"
                        FontSize="11" Foreground="#cdd6f4"
                        VerticalAlignment="Center"/>
-            <TextBlock Text="VoxMemo"
-                       FontSize="11" Foreground="#bac2de"
-                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <TextBlock Text="VoxMemo" FontSize="11" Foreground="#bac2de"
+                       VerticalAlignment="Center"/>
+            <TextBlock Text="v1.5.0" FontSize="11" Foreground="#585b70"
+                       VerticalAlignment="Center" Margin="4,0,16,0"/>
             <!-- Queue toggle + Processing indicator -->
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Button Command="{Binding ToggleQueueCommand}"
