@@ -1,0 +1,312 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VoxMemo.ViewModels"
+        xmlns:views="using:VoxMemo.Views"
+        x:Class="VoxMemo.Views.OnboardingWindow"
+        x:DataType="vm:OnboardingViewModel"
+        Title="VoxMemo Setup"
+        Width="640" Height="420"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="#1e1e2e"
+        ExtendClientAreaToDecorationsHint="False">
+
+  <Grid ColumnDefinitions="160,*">
+
+    <!-- Sidebar -->
+    <Border Grid.Column="0" Background="#11111b">
+      <StackPanel Margin="16,20,16,16" Spacing="0">
+        <TextBlock Text="VoxMemo" FontSize="16" FontWeight="Bold"
+                   Foreground="#cdd6f4" Margin="0,0,0,24"/>
+
+        <!-- Welcome step indicator -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Border Width="22" Height="22" CornerRadius="11"
+                  Background="{Binding CurrentStep,
+                    Converter={x:Static views:OnboardingWindow.WelcomeBgConverter}}">
+            <TextBlock Text="✦" FontSize="9" FontWeight="Bold" Foreground="#1e1e2e"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <TextBlock Text="Welcome" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{Binding IsStep0,
+                       Converter={x:Static views:OnboardingWindow.ActiveFgConverter}}"/>
+        </StackPanel>
+        <Border Width="2" Height="12" Background="#313244"
+                HorizontalAlignment="Left" Margin="10,2"/>
+
+        <!-- Step 1 -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Border Width="22" Height="22" CornerRadius="11"
+                  Background="{Binding CurrentStep,
+                    Converter={x:Static views:OnboardingWindow.StepBgConverter},
+                    ConverterParameter=1}">
+            <TextBlock FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="{Binding CurrentStep,
+                         Converter={x:Static views:OnboardingWindow.StepTextConverter},
+                         ConverterParameter=1}"/>
+          </Border>
+          <TextBlock Text="AI Provider" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{Binding CurrentStep,
+                       Converter={x:Static views:OnboardingWindow.StepFgConverter},
+                       ConverterParameter=1}"/>
+        </StackPanel>
+        <Border Width="2" Height="12" Background="#313244"
+                HorizontalAlignment="Left" Margin="10,2"/>
+
+        <!-- Step 2 -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Border Width="22" Height="22" CornerRadius="11"
+                  Background="{Binding CurrentStep,
+                    Converter={x:Static views:OnboardingWindow.StepBgConverter},
+                    ConverterParameter=2}">
+            <TextBlock FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="{Binding CurrentStep,
+                         Converter={x:Static views:OnboardingWindow.StepTextConverter},
+                         ConverterParameter=2}"/>
+          </Border>
+          <TextBlock Text="Whisper Model" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{Binding CurrentStep,
+                       Converter={x:Static views:OnboardingWindow.StepFgConverter},
+                       ConverterParameter=2}"/>
+        </StackPanel>
+        <Border Width="2" Height="12" Background="#313244"
+                HorizontalAlignment="Left" Margin="10,2"/>
+
+        <!-- Step 3 -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Border Width="22" Height="22" CornerRadius="11"
+                  Background="{Binding CurrentStep,
+                    Converter={x:Static views:OnboardingWindow.StepBgConverter},
+                    ConverterParameter=3}">
+            <TextBlock FontSize="10" FontWeight="Bold" Foreground="#1e1e2e"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="{Binding CurrentStep,
+                         Converter={x:Static views:OnboardingWindow.StepTextConverter},
+                         ConverterParameter=3}"/>
+          </Border>
+          <TextBlock Text="Audio Device" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{Binding CurrentStep,
+                       Converter={x:Static views:OnboardingWindow.StepFgConverter},
+                       ConverterParameter=3}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Content -->
+    <Grid Grid.Column="1" Margin="28,24,28,20">
+
+      <!-- Step 0: Welcome -->
+      <Grid IsVisible="{Binding IsStep0}" RowDefinitions="*,Auto">
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Spacing="10">
+          <TextBlock Text="VoxMemo" FontSize="30" FontWeight="Bold"
+                     Foreground="#cba6f7" HorizontalAlignment="Center"/>
+          <TextBlock Text="Record. Transcribe. Summarize."
+                     FontSize="14" Foreground="#cdd6f4" HorizontalAlignment="Center"/>
+          <TextBlock Text="Takes 2 minutes. Everything runs locally on your machine."
+                     FontSize="11" Foreground="#7f849c" HorizontalAlignment="Center"
+                     TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Spacing="8">
+          <Button Content="Get Started" Command="{Binding NextCommand}"
+                  Background="#cba6f7" Foreground="#1e1e2e"
+                  CornerRadius="8" Padding="36,12" FontSize="14" FontWeight="SemiBold"/>
+          <Button Content="Set up later" Command="{Binding SkipCommand}"
+                  Background="Transparent" Foreground="#585b70" BorderThickness="0" FontSize="12"
+                  HorizontalAlignment="Center"/>
+        </StackPanel>
+      </Grid>
+
+      <!-- Step 1: AI Provider -->
+      <Grid IsVisible="{Binding IsStep1}" RowDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+          <TextBlock Text="Choose your AI provider" FontSize="16" FontWeight="SemiBold"
+                     Foreground="#cdd6f4"/>
+          <TextBlock Text="Used for summaries and speaker identification"
+                     FontSize="11" Foreground="#7f849c" Margin="0,3,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Spacing="6">
+          <Border x:Name="OllamaCard" CornerRadius="8" Padding="12,10" Cursor="Hand"
+                  Tapped="OnOllamaTapped"
+                  Background="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBgConverter},
+                    ConverterParameter=Ollama}"
+                  BorderThickness="1"
+                  BorderBrush="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBorderConverter},
+                    ConverterParameter=Ollama}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Ollama" FontSize="13" FontWeight="SemiBold" Foreground="#cba6f7"/>
+              <TextBlock Text="Local · private · no API key needed" FontSize="11" Foreground="#7f849c"/>
+              <TextBlock Text="{Binding OllamaStatus}" FontSize="11" Foreground="#a6e3a1"
+                         IsVisible="{Binding OllamaStatus,
+                           Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                         Margin="0,3,0,0"/>
+            </StackPanel>
+          </Border>
+          <Border x:Name="OpenAiCard" CornerRadius="8" Padding="12,10" Cursor="Hand"
+                  Tapped="OnOpenAiTapped"
+                  Background="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBgConverter},
+                    ConverterParameter=OpenAI}"
+                  BorderThickness="1"
+                  BorderBrush="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBorderConverter},
+                    ConverterParameter=OpenAI}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="OpenAI" FontSize="13" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+              <TextBlock Text="GPT-4o · requires API key" FontSize="11" Foreground="#7f849c"/>
+            </StackPanel>
+          </Border>
+          <Border x:Name="AnthropicCard" CornerRadius="8" Padding="12,10" Cursor="Hand"
+                  Tapped="OnAnthropicTapped"
+                  Background="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBgConverter},
+                    ConverterParameter=Anthropic}"
+                  BorderThickness="1"
+                  BorderBrush="{Binding SelectedAiProvider,
+                    Converter={x:Static views:OnboardingWindow.ProviderBorderConverter},
+                    ConverterParameter=Anthropic}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Anthropic" FontSize="13" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+              <TextBlock Text="Claude · requires API key" FontSize="11" Foreground="#7f849c"/>
+            </StackPanel>
+          </Border>
+          <TextBox Text="{Binding ApiKey}" PasswordChar="●"
+                   Watermark="Paste API key here..."
+                   IsVisible="{Binding ShowApiKey}"
+                   Background="#313244" Foreground="#cdd6f4"
+                   CornerRadius="6" Padding="10,8" Margin="0,4,0,0"/>
+        </StackPanel>
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+          <Button Grid.Column="0" Content="Skip for now" Command="{Binding SkipCommand}"
+                  Background="Transparent" Foreground="#585b70" BorderThickness="0" FontSize="12"
+                  HorizontalAlignment="Left" VerticalAlignment="Center"/>
+          <Button Grid.Column="1" Content="Next →" Command="{Binding NextCommand}"
+                  Background="#cba6f7" Foreground="#1e1e2e"
+                  CornerRadius="6" Padding="20,8" FontSize="13" FontWeight="SemiBold"/>
+        </Grid>
+      </Grid>
+
+      <!-- Step 2: Whisper Model -->
+      <Grid IsVisible="{Binding IsStep2}" RowDefinitions="Auto,*,Auto,Auto">
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+          <TextBlock Text="Download a Whisper model" FontSize="16" FontWeight="SemiBold"
+                     Foreground="#cdd6f4"/>
+          <TextBlock Text="Used to transcribe your recordings locally"
+                     FontSize="11" Foreground="#7f849c" Margin="0,3,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Spacing="6">
+          <!-- base -->
+          <Border Background="#181825" CornerRadius="8" Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="base" FontSize="13" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+                  <Border Background="#cba6f7" CornerRadius="3" Padding="5,1">
+                    <TextBlock Text="Recommended" FontSize="9" FontWeight="Bold" Foreground="#1e1e2e"/>
+                  </Border>
+                </StackPanel>
+                <TextBlock Text="142 MB · Good accuracy · Fast" FontSize="11" Foreground="#7f849c"/>
+              </StackPanel>
+              <Button Grid.Column="1" Content="Download"
+                      Command="{Binding DownloadModelCommand}" CommandParameter="base"
+                      IsEnabled="{Binding !IsDownloading}"
+                      Background="#cba6f7" Foreground="#1e1e2e"
+                      CornerRadius="4" Padding="10,5" FontSize="11" FontWeight="SemiBold"/>
+            </Grid>
+          </Border>
+          <!-- tiny -->
+          <Border Background="#181825" CornerRadius="8" Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="tiny" FontSize="13" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+                <TextBlock Text="75 MB · Lower accuracy · Fastest" FontSize="11" Foreground="#7f849c"/>
+              </StackPanel>
+              <Button Grid.Column="1" Content="Download"
+                      Command="{Binding DownloadModelCommand}" CommandParameter="tiny"
+                      IsEnabled="{Binding !IsDownloading}"
+                      Background="#89b4fa" Foreground="#1e1e2e"
+                      CornerRadius="4" Padding="10,5" FontSize="11" FontWeight="SemiBold"/>
+            </Grid>
+          </Border>
+          <!-- small -->
+          <Border Background="#181825" CornerRadius="8" Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="small" FontSize="13" FontWeight="SemiBold" Foreground="#cdd6f4"/>
+                <TextBlock Text="466 MB · Better accuracy · Slower" FontSize="11" Foreground="#7f849c"/>
+              </StackPanel>
+              <Button Grid.Column="1" Content="Download"
+                      Command="{Binding DownloadModelCommand}" CommandParameter="small"
+                      IsEnabled="{Binding !IsDownloading}"
+                      Background="#89b4fa" Foreground="#1e1e2e"
+                      CornerRadius="4" Padding="10,5" FontSize="11" FontWeight="SemiBold"/>
+            </Grid>
+          </Border>
+        </StackPanel>
+        <TextBlock Grid.Row="2" Text="{Binding DownloadProgress}" FontSize="12"
+                   Foreground="#f9e2af" Margin="0,8,0,0"
+                   IsVisible="{Binding DownloadProgress,
+                     Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+          <Button Grid.Column="0" Content="Skip — download later in Settings"
+                  Command="{Binding SkipCommand}"
+                  Background="Transparent" Foreground="#585b70" BorderThickness="0" FontSize="12"
+                  HorizontalAlignment="Left" VerticalAlignment="Center"/>
+          <Button Grid.Column="1" Content="Next →" Command="{Binding NextCommand}"
+                  IsEnabled="{Binding ModelDownloaded}"
+                  Background="#cba6f7" Foreground="#1e1e2e"
+                  CornerRadius="6" Padding="20,8" FontSize="13" FontWeight="SemiBold"/>
+        </Grid>
+      </Grid>
+
+      <!-- Step 3: Audio Device -->
+      <Grid IsVisible="{Binding IsStep3}" RowDefinitions="Auto,*,Auto,Auto">
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+          <TextBlock Text="Select your microphone" FontSize="16" FontWeight="SemiBold"
+                     Foreground="#cdd6f4"/>
+          <TextBlock Text="You can change this at any time in Settings"
+                     FontSize="11" Foreground="#7f849c" Margin="0,3,0,0"/>
+        </StackPanel>
+        <ListBox Grid.Row="1"
+                 ItemsSource="{Binding AvailableDevices}"
+                 SelectedItem="{Binding SelectedDevice}"
+                 Background="Transparent">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="12,8"/>
+              <Setter Property="Margin" Value="0,3"/>
+              <Setter Property="CornerRadius" Value="8"/>
+              <Setter Property="Background" Value="#181825"/>
+            </Style>
+            <Style Selector="ListBoxItem:selected">
+              <Setter Property="Background" Value="#313244"/>
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:AudioDeviceItem">
+              <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#cdd6f4"/>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <!-- Error message -->
+        <TextBlock Grid.Row="2" Text="{Binding ErrorMessage}" FontSize="12"
+                   Foreground="#f38ba8" Margin="0,8,0,0"
+                   IsVisible="{Binding ErrorMessage,
+                     Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+          <Button Grid.Column="0" Content="← Back" Command="{Binding BackCommand}"
+                  Background="Transparent" Foreground="#7f849c" BorderThickness="0" FontSize="12"
+                  HorizontalAlignment="Left" VerticalAlignment="Center"/>
+          <Button Grid.Column="1" Content="Finish →" Command="{Binding NextCommand}"
+                  Background="#a6e3a1" Foreground="#1e1e2e"
+                  CornerRadius="6" Padding="20,8" FontSize="13" FontWeight="SemiBold"/>
+        </Grid>
+      </Grid>
+
+    </Grid>
+  </Grid>
+</Window>
