@@ -52,20 +52,21 @@ Built with .NET 10 and Avalonia UI. Runs on Windows, Linux, and macOS.
 ### Recording
 - **Mic + Speaker mix** — records both your voice and remote participants in one file (ideal for Zoom/Teams/Meet)
 - Record from **microphone**, **system audio**, or **both simultaneously**
-- **Live captions** while recording (Whisper tiny model, auto-downloaded)
+- **Live captions** while recording (Whisper tiny model, auto-downloaded) — new line per sentence, selectable and copyable
 - **Pause/resume** recording
 - **Global hotkey** (default Ctrl+Shift+R) to start/stop from anywhere
 - **System tray** with full controls: start, stop, pause, audio source, device, language
 
 ### Transcription
 - Local speech-to-text powered by **Whisper.net** — no cloud required, no data sent anywhere
+- **Auto language detection** — Whisper automatically detects language, including mixed Vietnamese/English conversations
 - Supports 30+ languages including English, Vietnamese, Chinese, Japanese, Korean, French, German, Spanish
 - Import and use **custom Whisper models** (any ggml-format .bin file)
 - Auto-converts imported audio (MP3, M4A, OGG, FLAC, etc.) to Whisper-compatible WAV
 
 ### AI Processing
 - **Smart Process** — one-click pipeline: Transcribe → Identify Speakers → Summarize
-- **Speaker identification** — AI reformats transcript as dialog with named speaker labels
+- **Speaker identification** — AI reformats transcript as dialog with named speaker labels, shown in a dedicated Speakers tab (original transcript preserved)
 - **Meeting summarization** — structured summaries referencing speakers by name
 - **Auto-title generation** — AI creates descriptive meeting titles from content
 - **Custom AI prompts** — override summary and speaker identification instructions
@@ -75,7 +76,7 @@ Built with .NET 10 and Avalonia UI. Runs on Windows, Linux, and macOS.
 ### Meetings Management
 - **Import audio** — upload existing MP3, WAV, M4A, OGG, FLAC, WMA, AAC files
 - **Import transcript** — paste text or load a .txt file to skip recording entirely
-- **Audio player** with play, pause, stop, and seek slider
+- **Audio player** with play, pause, stop, and seek slider — state preserved when switching tabs
 - **Editable transcripts** — correct text before summarizing
 - **Copy and export** — clipboard or file export for transcript/summary/audio
 - **Search** meetings by title, platform, or date
@@ -87,6 +88,10 @@ Built with .NET 10 and Avalonia UI. Runs on Windows, Linux, and macOS.
 - **Cancel** active jobs or **remove** queued ones
 - **Toast notifications** on completion/failure
 - Jobs process **sequentially** in guaranteed order
+
+### First-Run Setup
+- **Onboarding wizard** on first launch — configure AI provider, download a Whisper model, and select audio device in one guided flow
+- Re-run anytime from **Settings → Re-run Setup Wizard**
 
 ### Settings
 - **AI provider** configuration with live model refresh
@@ -103,15 +108,15 @@ Built with .NET 10 and Avalonia UI. Runs on Windows, Linux, and macOS.
 
 ## Download
 
-👉 **[Latest release — v1.0.0](https://github.com/annguyen209/VoxMemo/releases/latest)**
+👉 **[Latest release — v1.5.0](https://github.com/AnsCodeLab/VoxMemo/releases/latest)**
 
 | Platform | Download |
 |---|---|
-| Windows (Installer) | `VoxMemo-v1.0.0-Setup.exe` |
-| Windows (Portable) | `VoxMemo-win-x64.zip` |
-| Linux x64 | `VoxMemo-linux-x64.tar.gz` |
-| macOS Intel | `VoxMemo-osx-x64.tar.gz` |
-| macOS Apple Silicon | `VoxMemo-osx-arm64.tar.gz` |
+| Windows (Installer) | `VoxMemo-v1.5.0-Setup.exe` |
+| Windows (Portable) | `VoxMemo-v1.5.0-win-x64.zip` |
+| Linux x64 | `VoxMemo-v1.5.0-linux-x64.tar.gz` |
+| macOS Intel | `VoxMemo-v1.5.0-osx-x64.tar.gz` |
+| macOS Apple Silicon | `VoxMemo-v1.5.0-osx-arm64.tar.gz` |
 
 ---
 
@@ -194,7 +199,7 @@ Enter your API key in Settings → AI Provider.
 ## Build from Source
 
 ```bash
-git clone https://github.com/annguyen209/VoxMemo.git
+git clone https://github.com/AnsCodeLab/VoxMemo.git
 cd VoxMemo
 dotnet restore
 dotnet run
@@ -252,4 +257,4 @@ dotnet test
 
 ## Author
 
-**Anzdev4life** — [github.com/annguyen209](https://github.com/annguyen209)
+**AnsCodeLab** — [github.com/AnsCodeLab](https://github.com/AnsCodeLab)
