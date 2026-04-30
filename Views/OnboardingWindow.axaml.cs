@@ -71,6 +71,8 @@ file sealed class ProviderBrushConverter : IValueConverter
 
 public partial class OnboardingWindow : Window
 {
+    private bool _closeInitiatedByVm;
+
     // Welcome circle: active (step 0) = purple, done (step > 0) = green
     public static readonly IValueConverter WelcomeBgConverter =
         new FuncValueConverter<int, IBrush>(step =>
@@ -108,11 +110,12 @@ public partial class OnboardingWindow : Window
         InitializeComponent();
         var vm = new OnboardingViewModel();
         DataContext = vm;
-        vm.CloseRequested += (_, _) => Close();
+        vm.CloseRequested += (_, _) => { _closeInitiatedByVm = true; Close(); };
 
         // X-button close: mark onboarding done so it doesn't reappear
         Closing += async (_, _) =>
         {
+            if (_closeInitiatedByVm) return;
             if (DataContext is OnboardingViewModel closingVm)
                 await closingVm.SkipCommand.ExecuteAsync(null);
         };
