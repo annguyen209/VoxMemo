@@ -4,7 +4,7 @@ set -e
 echo "=== VoxMemo Cross-Platform Build ==="
 
 PUBLISH_DIR="publish"
-VERSION="1.4.0"
+VERSION="1.5.0"
 ISCC="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
 
 # Clean
