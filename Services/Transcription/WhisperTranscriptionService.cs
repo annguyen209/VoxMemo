@@ -164,9 +164,10 @@ public class WhisperTranscriptionService : ITranscriptionService
             Log.Information("Transcribing {AudioPath} with model={Model} language={Language}", audioPath, modelName, language);
             using var whisperFactory = WhisperFactory.FromPath(modelPath);
 
-            await using var processor = whisperFactory.CreateBuilder()
-                .WithLanguage(language)
-                .Build();
+            var builder = whisperFactory.CreateBuilder();
+            if (language != "auto" && !string.IsNullOrEmpty(language))
+                builder = builder.WithLanguage(language);
+            await using var processor = builder.Build();
 
             var segments = new List<TranscriptionSegment>();
             int segmentIndex = 0;

@@ -354,7 +354,7 @@ public partial class MeetingItemViewModel : ViewModelBase
                 return setting.Value.Split(',').ToList();
         }
         catch { }
-        return ["en", "vi"];
+        return ["auto", "en", "vi"];
     }
 
     private bool _langInitDone;

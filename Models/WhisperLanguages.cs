@@ -6,6 +6,7 @@ public static class WhisperLanguages
 {
     public static readonly List<LanguageItem> All =
     [
+        new("auto", "Auto-detect"),
         new("en", "English"),
         new("vi", "Vietnamese"),
         new("zh", "Chinese"),

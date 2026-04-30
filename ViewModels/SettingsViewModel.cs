@@ -164,13 +164,13 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private ObservableCollection<Models.LanguageItem> _enabledLanguages = new(
-        Models.WhisperLanguages.All.FindAll(l => l.Code is "en" or "vi"));
+        Models.WhisperLanguages.All.FindAll(l => l.Code is "auto" or "en" or "vi"));
 
     [ObservableProperty]
-    private ObservableCollection<string> _enabledLanguageCodes = ["en", "vi"];
+    private ObservableCollection<string> _enabledLanguageCodes = ["auto", "en", "vi"];
 
     [ObservableProperty]
-    private string _defaultLanguage = "en";
+    private string _defaultLanguage = "auto";
 
     /// <summary>Raised when enabled languages change so RecordingViewModel can update.</summary>
     public static event System.EventHandler<List<string>>? EnabledLanguagesChanged;
@@ -256,11 +256,11 @@ public partial class SettingsViewModel : ViewModelBase
             CustomSummaryPrompt = await GetSettingAsync(db, "custom_summary_prompt", string.Empty);
             CustomSpeakerPrompt = await GetSettingAsync(db, "custom_speaker_prompt", string.Empty);
             StartWithWindows = Services.Platform.PlatformServices.Startup.IsStartupEnabled();
-            var langCodes = await GetSettingAsync(db, "enabled_languages", "en,vi");
+            var langCodes = await GetSettingAsync(db, "enabled_languages", "auto,en,vi");
             EnabledLanguages = new ObservableCollection<Models.LanguageItem>(
                 Models.WhisperLanguages.All.FindAll(l => langCodes.Split(',').Contains(l.Code)));
             SyncLanguageCodes();
-            DefaultLanguage = await GetSettingAsync(db, "default_language", "en");
+            DefaultLanguage = await GetSettingAsync(db, "default_language", "auto");
             StoragePath = await GetSettingAsync(db, "storage_path",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VoxMemo"));
             SelectedTheme = await GetSettingAsync(db, "ui_theme", "dark");

@@ -43,7 +43,7 @@ public partial class RecordingViewModel : ViewModelBase
     private string _meetingTitle = string.Empty;
 
     [ObservableProperty]
-    private string _selectedLanguage = "en";
+    private string _selectedLanguage = "auto";
 
     // Audio source: user picks Microphone or System Audio
     [ObservableProperty]
@@ -86,7 +86,7 @@ public partial class RecordingViewModel : ViewModelBase
                 return setting.Value.Split(',').ToList();
         }
         catch { }
-        return ["en", "vi"];
+        return ["auto", "en", "vi"];
     }
 
     public RecordingViewModel()
