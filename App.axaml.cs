@@ -120,7 +120,13 @@ public partial class App : Application
             {
                 mainWindow.IsVisible = false;
                 var onboarding = new VoxMemo.Views.OnboardingWindow();
-                onboarding.Closed += (_, _) => mainWindow.IsVisible = true;
+                onboarding.Closed += (_, _) =>
+                {
+                    mainWindow.IsVisible = true;
+                    // Reload settings and recording VM so onboarding choices are reflected immediately
+                    _ = _mainVm.Settings.LoadSettingsCommand.ExecuteAsync(null);
+                    _mainVm.Recording.RefreshDevicesCommand.Execute(null);
+                };
                 onboarding.Show();
             }
 
