@@ -27,6 +27,7 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private bool _modelDownloaded;
     [ObservableProperty] private string _downloadedModelName = string.Empty;
     [ObservableProperty] private AudioDeviceItem? _selectedDevice;
+    [ObservableProperty] private string _errorMessage = string.Empty;
 
     public ObservableCollection<AudioDeviceItem> AvailableDevices { get; } = [];
 
@@ -46,7 +47,7 @@ public partial class OnboardingViewModel : ViewModelBase
 
     public event EventHandler? CloseRequested;
 
-    public void RaiseCloseForTest() => CloseRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaiseCloseForTest() => CloseRequested?.Invoke(this, EventArgs.Empty);
 
     partial void OnCurrentStepChanged(int value)
     {
@@ -96,7 +97,7 @@ public partial class OnboardingViewModel : ViewModelBase
             var service = new WhisperTranscriptionService();
             await service.DownloadModelAsync(modelName, new Progress<float>(mb =>
             {
-                DownloadProgress = $"Downloading {modelName}… {mb:F0} MB";
+                DownloadProgress = $"Downloading {modelName}… {mb / 1_048_576f:F1} MB";
             }));
             DownloadedModelName = modelName;
             ModelDownloaded = true;
@@ -113,38 +114,57 @@ public partial class OnboardingViewModel : ViewModelBase
         }
     }
 
+    private System.Threading.CancellationTokenSource? _ollamaCts;
+
     [RelayCommand]
     private async Task CheckOllamaAsync()
     {
+        _ollamaCts?.Cancel();
+        _ollamaCts = new System.Threading.CancellationTokenSource();
+        var ct = _ollamaCts.Token;
         OllamaStatus = "Checking...";
         try
         {
             var provider = new OllamaProvider("http://localhost:11434");
             var models = await provider.GetAvailableModelsAsync();
+            if (ct.IsCancellationRequested) return;
             OllamaStatus = models.Count > 0
                 ? $"✓ Detected at localhost:11434 ({models.Count} models)"
                 : "✓ Connected — no models yet (run 'ollama pull llama3')";
         }
         catch
         {
-            OllamaStatus = "Not running — install Ollama or choose another provider";
+            if (!ct.IsCancellationRequested)
+                OllamaStatus = "Not running — install Ollama or choose another provider";
         }
     }
 
     private void LoadDevices()
     {
-        AvailableDevices.Clear();
-        AvailableDevices.Add(new AudioDeviceItem(null, "Auto (Default)", false));
         try
         {
-            foreach (var d in PlatformServices.AudioRecorder.GetInputDevices())
-                AvailableDevices.Add(new AudioDeviceItem(d.Id, d.Name, d.IsLoopback));
+            var devices = new System.Collections.Generic.List<AudioDeviceItem>();
+            devices.Add(new AudioDeviceItem(null, "Auto (Default)", false));
+            try
+            {
+                foreach (var d in PlatformServices.AudioRecorder.GetInputDevices())
+                    devices.Add(new AudioDeviceItem(d.Id, d.Name, d.IsLoopback));
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to enumerate audio devices in onboarding");
+            }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                AvailableDevices.Clear();
+                foreach (var d in devices) AvailableDevices.Add(d);
+                SelectedDevice = AvailableDevices[0];
+            });
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to enumerate audio devices in onboarding");
+            Log.Warning(ex, "Failed to load devices in onboarding");
         }
-        SelectedDevice = AvailableDevices[0];
     }
 
     private async Task FinishAsync()
@@ -163,12 +183,13 @@ public partial class OnboardingViewModel : ViewModelBase
                 await UpsertAsync(db, "audio_input_device", SelectedDevice.Id);
             await UpsertAsync(db, "onboarding_complete", "true");
             await db.SaveChangesAsync();
+            CloseRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to save onboarding settings");
+            ErrorMessage = "Failed to save settings. Please try again.";
         }
-        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task SaveAndCloseAsync()
@@ -178,12 +199,13 @@ public partial class OnboardingViewModel : ViewModelBase
             await using var db = AppDbContextFactory.Create();
             await UpsertAsync(db, "onboarding_complete", "true");
             await db.SaveChangesAsync();
+            CloseRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to mark onboarding complete on skip");
+            ErrorMessage = "Failed to save settings. Please try again.";
         }
-        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static async Task UpsertAsync(AppDbContext db, string key, string value)
