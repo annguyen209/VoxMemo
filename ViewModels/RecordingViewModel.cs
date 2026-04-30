@@ -116,6 +116,20 @@ public partial class RecordingViewModel : ViewModelBase
         };
         RefreshDeviceList();
 
+        // Restore saved audio device from onboarding/settings
+        try
+        {
+            using var db = Services.Database.AppDbContextFactory.Create();
+            db.Database.EnsureCreated();
+            var deviceSetting = db.AppSettings.FirstOrDefault(s => s.Key == "audio_input_device");
+            if (deviceSetting != null && !string.IsNullOrEmpty(deviceSetting.Value))
+            {
+                var saved = Devices.FirstOrDefault(d => d.Id == deviceSetting.Value);
+                if (saved != null) SelectedDevice = saved;
+            }
+        }
+        catch { }
+
         SettingsViewModel.EnabledLanguagesChanged += (_, codes) =>
         {
             Dispatcher.UIThread.Post(() =>

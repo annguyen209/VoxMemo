@@ -93,7 +93,7 @@ public partial class App : Application
         SetTheme(savedTheme);
 
         // Check if first-run onboarding is needed
-        bool needsOnboarding = false;
+        bool needsOnboarding = true;
         try
         {
             await using var onbDb = AppDbContextFactory.Create();
@@ -103,7 +103,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to check onboarding_complete, skipping wizard");
+            Log.Warning(ex, "Failed to check onboarding_complete, defaulting to show wizard");
         }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

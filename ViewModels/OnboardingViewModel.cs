@@ -62,10 +62,13 @@ public partial class OnboardingViewModel : ViewModelBase
     partial void OnSelectedAiProviderChanged(string value) =>
         OnPropertyChanged(nameof(ShowApiKey));
 
-    partial void OnIsDownloadingChanged(bool value) =>
+    partial void OnIsDownloadingChanged(bool value)
+    {
         OnPropertyChanged(nameof(CanGoNext));
+        NextCommand.NotifyCanExecuteChanged();
+    }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGoNext))]
     private async Task NextAsync()
     {
         if (CurrentStep < 3)
@@ -95,9 +98,9 @@ public partial class OnboardingViewModel : ViewModelBase
         try
         {
             var service = new WhisperTranscriptionService();
-            await service.DownloadModelAsync(modelName, new Progress<float>(mb =>
+            await service.DownloadModelAsync(modelName, new Progress<float>(bytes =>
             {
-                DownloadProgress = $"Downloading {modelName}… {mb / 1_048_576f:F1} MB";
+                DownloadProgress = $"Downloading {modelName}… {bytes / 1_048_576f:F1} MB";
             }));
             DownloadedModelName = modelName;
             ModelDownloaded = true;
@@ -120,13 +123,14 @@ public partial class OnboardingViewModel : ViewModelBase
     private async Task CheckOllamaAsync()
     {
         _ollamaCts?.Cancel();
+        _ollamaCts?.Dispose();
         _ollamaCts = new System.Threading.CancellationTokenSource();
         var ct = _ollamaCts.Token;
         OllamaStatus = "Checking...";
         try
         {
             var provider = new OllamaProvider("http://localhost:11434");
-            var models = await provider.GetAvailableModelsAsync();
+            var models = await provider.GetAvailableModelsAsync(ct);
             if (ct.IsCancellationRequested) return;
             OllamaStatus = models.Count > 0
                 ? $"✓ Detected at localhost:11434 ({models.Count} models)"

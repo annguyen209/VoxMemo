@@ -113,11 +113,12 @@ public partial class OnboardingWindow : Window
         vm.CloseRequested += (_, _) => { _closeInitiatedByVm = true; Close(); };
 
         // X-button close: mark onboarding done so it doesn't reappear
-        Closing += async (_, _) =>
+        Closing += (_, e) =>
         {
             if (_closeInitiatedByVm) return;
+            e.Cancel = true;
             if (DataContext is OnboardingViewModel closingVm)
-                await closingVm.SkipCommand.ExecuteAsync(null);
+                _ = closingVm.SkipCommand.ExecuteAsync(null);
         };
     }
 
